@@ -153,4 +153,51 @@ class FFmpegService {
 
         try await execute(arguments: arguments, progressHandler: progressHandler)
     }
+
+    /// 動画から音声を抽出（WAV形式）
+    /// - Parameters:
+    ///   - videoURL: 入力動画のURL
+    ///   - outputURL: 出力WAVファイルのURL
+    ///   - sampleRate: サンプルレート（デフォルト: 48000Hz）
+    func extractAudio(
+        from videoURL: URL,
+        to outputURL: URL,
+        sampleRate: Int = 48000
+    ) async throws {
+        let arguments = [
+            "-y",
+            "-hide_banner",
+            "-i", videoURL.path,
+            "-vn",
+            "-c:a", "pcm_s16le",
+            "-ar", String(sampleRate),
+            "-ac", "1",  // モノラルに変換（分析用）
+            outputURL.path
+        ]
+
+        try await execute(arguments: arguments)
+    }
+
+    /// 音声ファイルをWAV形式に変換
+    /// - Parameters:
+    ///   - audioURL: 入力音声のURL
+    ///   - outputURL: 出力WAVファイルのURL
+    ///   - sampleRate: サンプルレート（デフォルト: 48000Hz）
+    func convertToWav(
+        from audioURL: URL,
+        to outputURL: URL,
+        sampleRate: Int = 48000
+    ) async throws {
+        let arguments = [
+            "-y",
+            "-hide_banner",
+            "-i", audioURL.path,
+            "-c:a", "pcm_s16le",
+            "-ar", String(sampleRate),
+            "-ac", "1",  // モノラルに変換（分析用）
+            outputURL.path
+        ]
+
+        try await execute(arguments: arguments)
+    }
 }
