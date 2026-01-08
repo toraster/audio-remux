@@ -34,6 +34,12 @@ struct ExportSettings {
     var offsetSeconds: Double = 0.0
     var outputDirectory: URL?
 
+    /// 自動フェード有効（ぶつ切りノイズ対策）
+    var autoFadeEnabled: Bool = true
+
+    /// フェード時間（秒）- 固定値10ms
+    static let fadeSeconds: Double = 0.01
+
     /// 出力ファイル名を生成
     func outputFileName(from inputURL: URL) -> String {
         let baseName = inputURL.deletingPathExtension().lastPathComponent
