@@ -3,6 +3,7 @@ import SwiftUI
 /// メインコンテンツビュー
 struct ContentView: View {
     @StateObject private var viewModel = ProjectViewModel()
+    @StateObject private var syncViewModel = SyncAnalyzerViewModel()
 
     var body: some View {
         VStack(spacing: 20) {
@@ -11,6 +12,19 @@ struct ContentView: View {
 
             // ファイルドロップゾーン
             fileDropZonesView
+
+            // 波形同期（ファイル設定後に表示）
+            if viewModel.project.isReady {
+                WaveformSyncView(
+                    syncViewModel: syncViewModel,
+                    offsetSeconds: $viewModel.project.exportSettings.offsetSeconds,
+                    videoURL: viewModel.project.videoFile?.url,
+                    audioURL: viewModel.project.audioFile?.url,
+                    onOffsetChanged: { newOffset in
+                        viewModel.project.exportSettings.offsetSeconds = newOffset
+                    }
+                )
+            }
 
             // エクスポート設定
             if viewModel.project.isReady {
