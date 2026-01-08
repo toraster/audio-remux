@@ -345,7 +345,7 @@ struct WaveformCanvas: View {
                     path.move(to: CGPoint(x: 8, y: centerY))
                     path.addLine(to: CGPoint(x: width - 8, y: centerY))
                 }
-                .stroke(color.opacity(0.2), lineWidth: 1, dash: [4, 4])
+                .stroke(color.opacity(0.2), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
 
                 // 波形バー
                 if !samples.isEmpty {
