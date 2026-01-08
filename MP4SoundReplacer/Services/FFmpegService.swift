@@ -73,18 +73,20 @@ class FFmpegService {
     ) -> [String] {
         var args = ["-y", "-hide_banner"]
 
-        // 正のオフセット: 音声を遅らせる
+        // 動画入力（常に最初）
+        args += ["-i", videoURL.path]
+
+        // 正のオフセット: 音声を遅らせる（-itsoffsetは音声入力の直前に配置）
         if settings.offsetSeconds > 0 {
             args += ["-itsoffset", String(format: "%.3f", settings.offsetSeconds)]
         }
 
-        args += ["-i", videoURL.path]
-
-        // 負のオフセット: 音声の先頭をカット
+        // 負のオフセット: 音声の先頭をカット（-ssは音声入力の直前に配置）
         if settings.offsetSeconds < 0 {
             args += ["-ss", String(format: "%.3f", -settings.offsetSeconds)]
         }
 
+        // 音声入力
         args += ["-i", audioURL.path]
 
         // フェードフィルターの構築
