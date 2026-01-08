@@ -58,11 +58,18 @@ class FFmpegService {
     }
 
     /// 音声差し替えコマンドの引数を生成
+    /// - Parameters:
+    ///   - videoURL: 入力動画URL
+    ///   - audioURL: 入力音声URL
+    ///   - outputURL: 出力URL
+    ///   - settings: エクスポート設定
+    ///   - videoDuration: 動画の長さ（秒）- フェード適用時に使用
     func buildReplaceAudioArguments(
         videoURL: URL,
         audioURL: URL,
         outputURL: URL,
-        settings: ExportSettings
+        settings: ExportSettings,
+        videoDuration: Double? = nil
     ) -> [String] {
         var args = ["-y", "-hide_banner"]
 
@@ -79,6 +86,17 @@ class FFmpegService {
         }
 
         args += ["-i", audioURL.path]
+
+        // フェードフィルターの構築
+        if settings.autoFadeEnabled, let duration = videoDuration {
+            let fadeTime = ExportSettings.fadeSeconds
+            let fadeOutStart = max(0, duration - fadeTime)
+            let filterStr = String(
+                format: "afade=t=in:d=%.3f,afade=t=out:st=%.3f:d=%.3f",
+                fadeTime, fadeOutStart, fadeTime
+            )
+            args += ["-af", filterStr]
+        }
 
         // ストリームマッピングとコーデック設定
         args += [
@@ -144,11 +162,19 @@ class FFmpegService {
         settings: ExportSettings,
         progressHandler: ((Double) -> Void)? = nil
     ) async throws {
+        // フェード適用のため動画の長さを取得
+        var videoDuration: Double?
+        if settings.autoFadeEnabled {
+            let mediaFile = try? await FFprobeService.shared.getMediaInfo(url: videoURL)
+            videoDuration = mediaFile?.duration
+        }
+
         let arguments = buildReplaceAudioArguments(
             videoURL: videoURL,
             audioURL: audioURL,
             outputURL: outputURL,
-            settings: settings
+            settings: settings,
+            videoDuration: videoDuration
         )
 
         try await execute(arguments: arguments, progressHandler: progressHandler)
