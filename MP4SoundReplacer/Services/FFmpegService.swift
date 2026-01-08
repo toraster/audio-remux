@@ -123,33 +123,71 @@ class FFmpegService {
             throw FFmpegError.binaryNotFound
         }
 
-        // バックグラウンドスレッドで実行（デッドロック防止）
-        return try await Task.detached {
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: path)
-            process.arguments = arguments
+        // stdout/stderrを同時並行で読み取り（デッドロック防止）
+        return try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: path)
+                process.arguments = arguments
 
-            let outputPipe = Pipe()
-            let errorPipe = Pipe()
-            process.standardOutput = outputPipe
-            process.standardError = errorPipe
+                let outputPipe = Pipe()
+                let errorPipe = Pipe()
+                process.standardOutput = outputPipe
+                process.standardError = errorPipe
 
-            try process.run()
+                // 出力データを蓄積する変数
+                var outputData = Data()
+                var errorData = Data()
+                let dataLock = NSLock()
 
-            // パイプを先に読み取る（バッファ詰まり防止）
-            let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
-            let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+                // stdout を非同期で読み取り
+                outputPipe.fileHandleForReading.readabilityHandler = { handle in
+                    let data = handle.availableData
+                    if !data.isEmpty {
+                        dataLock.lock()
+                        outputData.append(data)
+                        dataLock.unlock()
+                    }
+                }
 
-            process.waitUntilExit()
+                // stderr を非同期で読み取り
+                errorPipe.fileHandleForReading.readabilityHandler = { handle in
+                    let data = handle.availableData
+                    if !data.isEmpty {
+                        dataLock.lock()
+                        errorData.append(data)
+                        dataLock.unlock()
+                    }
+                }
 
-            let output = String(data: outputData, encoding: .utf8) ?? ""
-            let errorOutput = String(data: errorData, encoding: .utf8) ?? ""
+                // プロセス終了時の処理
+                process.terminationHandler = { proc in
+                    // ハンドラをクリア
+                    outputPipe.fileHandleForReading.readabilityHandler = nil
+                    errorPipe.fileHandleForReading.readabilityHandler = nil
 
-            if process.terminationStatus != 0 {
-                throw FFmpegError.executionFailed(errorOutput)
+                    // 残りのデータを読み取り
+                    dataLock.lock()
+                    outputData.append(outputPipe.fileHandleForReading.readDataToEndOfFile())
+                    errorData.append(errorPipe.fileHandleForReading.readDataToEndOfFile())
+                    let finalOutput = String(data: outputData, encoding: .utf8) ?? ""
+                    let finalError = String(data: errorData, encoding: .utf8) ?? ""
+                    dataLock.unlock()
+
+                    if proc.terminationStatus != 0 {
+                        continuation.resume(throwing: FFmpegError.executionFailed(finalError))
+                    } else {
+                        continuation.resume(returning: finalOutput)
+                    }
+                }
+
+                do {
+                    try process.run()
+                } catch {
+                    continuation.resume(throwing: FFmpegError.executionFailed(error.localizedDescription))
+                }
             }
-            return output
-        }.value
+        }
     }
 
     /// 音声差し替えを実行
