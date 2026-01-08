@@ -120,7 +120,7 @@ struct ContentView: View {
                     viewModel.setVideoFile(url: url)
                 }
             }
-            .frame(minWidth: 200)
+            .frame(minWidth: 150, maxWidth: 250)
 
             // 音声ファイル
             AudioDropZone(file: viewModel.project.audioFile) { url in
@@ -131,12 +131,12 @@ struct ContentView: View {
                     viewModel.setAudioFile(url: url)
                 }
             }
-            .frame(minWidth: 200)
+            .frame(minWidth: 150, maxWidth: 250)
 
             // エクスポート設定（ファイル設定後に表示）
             if viewModel.project.isReady {
                 ExportSettingsView(settings: $viewModel.project.exportSettings)
-                    .frame(minWidth: 280)
+                    .frame(minWidth: 350)
             }
         }
     }
