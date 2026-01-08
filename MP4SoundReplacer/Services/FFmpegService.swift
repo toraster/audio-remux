@@ -123,7 +123,8 @@ class FFmpegService {
             throw FFmpegError.binaryNotFound
         }
 
-        return try await withCheckedThrowingContinuation { continuation in
+        // バックグラウンドスレッドで実行（デッドロック防止）
+        return try await Task.detached {
             let process = Process()
             process.executableURL = URL(fileURLWithPath: path)
             process.arguments = arguments
@@ -133,27 +134,22 @@ class FFmpegService {
             process.standardOutput = outputPipe
             process.standardError = errorPipe
 
-            do {
-                try process.run()
-            } catch {
-                continuation.resume(throwing: FFmpegError.executionFailed(error.localizedDescription))
-                return
-            }
+            try process.run()
 
-            process.waitUntilExit()
-
+            // パイプを先に読み取る（バッファ詰まり防止）
             let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
             let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+
+            process.waitUntilExit()
 
             let output = String(data: outputData, encoding: .utf8) ?? ""
             let errorOutput = String(data: errorData, encoding: .utf8) ?? ""
 
             if process.terminationStatus != 0 {
-                continuation.resume(throwing: FFmpegError.executionFailed(errorOutput))
-            } else {
-                continuation.resume(returning: output)
+                throw FFmpegError.executionFailed(errorOutput)
             }
-        }
+            return output
+        }.value
     }
 
     /// 音声差し替えを実行

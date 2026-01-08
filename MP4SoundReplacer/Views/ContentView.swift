@@ -111,32 +111,31 @@ struct ContentView: View {
     /// 上部セクション: ファイルドロップゾーン + エクスポート設定
     private var topSection: some View {
         HStack(alignment: .top, spacing: 16) {
-            // 動画ファイル
-            VideoDropZone(file: viewModel.project.videoFile) { url in
-                if url.path.isEmpty {
-                    viewModel.clearVideoFile()
-                    syncViewModel.reset()
-                } else {
-                    viewModel.setVideoFile(url: url)
+            // 左側: ファイルドロップゾーン（縦並び）
+            VStack(spacing: 12) {
+                VideoDropZone(file: viewModel.project.videoFile) { url in
+                    if url.path.isEmpty {
+                        viewModel.clearVideoFile()
+                        syncViewModel.reset()
+                    } else {
+                        viewModel.setVideoFile(url: url)
+                    }
+                }
+
+                AudioDropZone(file: viewModel.project.audioFile) { url in
+                    if url.path.isEmpty {
+                        viewModel.clearAudioFile()
+                        syncViewModel.reset()
+                    } else {
+                        viewModel.setAudioFile(url: url)
+                    }
                 }
             }
-            .frame(minWidth: 150, maxWidth: 250)
+            .frame(width: 280)
 
-            // 音声ファイル
-            AudioDropZone(file: viewModel.project.audioFile) { url in
-                if url.path.isEmpty {
-                    viewModel.clearAudioFile()
-                    syncViewModel.reset()
-                } else {
-                    viewModel.setAudioFile(url: url)
-                }
-            }
-            .frame(minWidth: 150, maxWidth: 250)
-
-            // エクスポート設定（ファイル設定後に表示）
+            // 右側: エクスポート設定（広く確保）
             if viewModel.project.isReady {
                 ExportSettingsView(settings: $viewModel.project.exportSettings)
-                    .frame(minWidth: 350)
             }
         }
     }
