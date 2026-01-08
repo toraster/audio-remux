@@ -23,15 +23,12 @@ struct ContentView: View {
             .ignoresSafeArea()
 
             ScrollView {
-                VStack(spacing: 24) {
+                VStack(spacing: 12) {
                     // ヘッダー
                     headerView
-                        .padding(.horizontal, 32)
-                        .padding(.top, 24)
 
-                    // 上部セクション: ファイルドロップゾーン + エクスポート設定を横並び（50/50）
+                    // 上部セクション: ファイルドロップゾーン + エクスポート設定を横並び
                     topSection
-                        .padding(.horizontal, 32)
 
                     // 波形同期（常に表示、無効状態で）
                     WaveformSyncView(
@@ -48,39 +45,34 @@ struct ContentView: View {
                     )
                     .disabled(!viewModel.project.isReady)
                     .opacity(viewModel.project.isReady ? 1.0 : 0.5)
-                    .padding(.horizontal, 32)
                     .animation(.easeInOut(duration: 0.3), value: viewModel.project.isReady)
 
                     // アクションボタン
                     actionButtonsView
-                        .padding(.horizontal, 32)
 
                     // プログレス表示
                     if case .exporting(let progress) = viewModel.project.state {
                         ProgressView(value: progress)
                             .progressViewStyle(.linear)
-                            .padding(.horizontal, 32)
                             .transition(.opacity.combined(with: .scale))
                     }
 
                     // エラー表示
                     if case .error(let message) = viewModel.project.state {
                         errorView(message)
-                            .padding(.horizontal, 32)
                             .transition(.opacity.combined(with: .scale))
                     }
 
                     // 完了表示
                     if case .completed(let url) = viewModel.project.state {
                         completedView(url)
-                            .padding(.horizontal, 32)
                             .transition(.opacity.combined(with: .scale))
                     }
                 }
-                .padding(.bottom, 32)
+                .padding(16)
             }
         }
-        .frame(minWidth: 900, minHeight: 700)
+        .frame(minWidth: 660, minHeight: 520)
         // 自動波形表示: 両方のファイルがセットされたら自動的に波形を生成
         .onChange(of: viewModel.project.isReady) { isReady in
             if isReady {
@@ -182,7 +174,7 @@ struct ContentView: View {
             // FFmpeg状態表示
             ffmpegStatusView
         }
-        .padding(20)
+        .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 16)
                 .fill(Color(NSColor.controlBackgroundColor))
@@ -218,39 +210,35 @@ struct ContentView: View {
 
     /// 上部セクション: ファイルドロップゾーン + エクスポート設定（50/50レイアウト）
     private var topSection: some View {
-        GeometryReader { geometry in
-            let halfWidth = (geometry.size.width - 16) / 2
-            HStack(alignment: .top, spacing: 16) {
-                // 左側: ファイルドロップゾーン（縦並び）
-                VStack(spacing: 12) {
-                    VideoDropZone(file: viewModel.project.videoFile) { url in
-                        if url.path.isEmpty {
-                            viewModel.clearVideoFile()
-                            syncViewModel.reset()
-                        } else {
-                            setVideoFile(url: url)
-                        }
-                    }
-
-                    AudioDropZone(file: viewModel.project.audioFile) { url in
-                        if url.path.isEmpty {
-                            viewModel.clearAudioFile()
-                            syncViewModel.reset()
-                        } else {
-                            setAudioFile(url: url)
-                        }
+        HStack(alignment: .top, spacing: 12) {
+            // 左側: ファイルドロップゾーン（縦並び）
+            VStack(spacing: 8) {
+                VideoDropZone(file: viewModel.project.videoFile) { url in
+                    if url.path.isEmpty {
+                        viewModel.clearVideoFile()
+                        syncViewModel.reset()
+                    } else {
+                        setVideoFile(url: url)
                     }
                 }
-                .frame(width: halfWidth)
 
-                // 右側: エクスポート設定（常に表示、無効状態で）
-                ExportSettingsView(settings: $viewModel.project.exportSettings)
-                    .disabled(!viewModel.project.isReady)
-                    .opacity(viewModel.project.isReady ? 1.0 : 0.5)
-                    .frame(width: halfWidth)
+                AudioDropZone(file: viewModel.project.audioFile) { url in
+                    if url.path.isEmpty {
+                        viewModel.clearAudioFile()
+                        syncViewModel.reset()
+                    } else {
+                        setAudioFile(url: url)
+                    }
+                }
             }
+            .frame(maxWidth: .infinity)
+
+            // 右側: エクスポート設定（常に表示、無効状態で）
+            ExportSettingsView(settings: $viewModel.project.exportSettings)
+                .disabled(!viewModel.project.isReady)
+                .opacity(viewModel.project.isReady ? 1.0 : 0.5)
+                .frame(maxWidth: .infinity)
         }
-        .frame(height: 280)
     }
 
     /// アクションボタン

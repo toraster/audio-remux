@@ -22,8 +22,8 @@ struct FileDropZone: View {
                 dropPromptView
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 130)
-        .padding(20)
+        .frame(maxWidth: .infinity, minHeight: 100)
+        .padding(16)
         .background(
             ZStack {
                 // ベース背景
@@ -83,7 +83,7 @@ struct FileDropZone: View {
 
     /// ドロップ待ち表示
     private var dropPromptView: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 8) {
             ZStack {
                 Circle()
                     .fill(
@@ -96,10 +96,10 @@ struct FileDropZone: View {
                             endPoint: .bottomTrailing
                         )
                     )
-                    .frame(width: 70, height: 70)
+                    .frame(width: 52, height: 52)
 
                 Image(systemName: icon)
-                    .font(.system(size: 32, weight: .medium))
+                    .font(.system(size: 24, weight: .medium))
                     .foregroundStyle(
                         LinearGradient(
                             colors: [Color.accentColor, Color.accentColor.opacity(0.7)],
@@ -109,26 +109,26 @@ struct FileDropZone: View {
                     )
             }
 
-            VStack(spacing: 4) {
+            VStack(spacing: 2) {
                 Text(title)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
 
                 Text("ドラッグ&ドロップ または")
-                    .font(.system(size: 13))
+                    .font(.system(size: 12))
                     .foregroundColor(.secondary)
             }
 
             Button(action: {
                 selectFile()
             }) {
-                HStack(spacing: 6) {
+                HStack(spacing: 5) {
                     Image(systemName: "doc.badge.plus")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: 11, weight: .semibold))
                     Text("ファイルを選択")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold))
                 }
-                .padding(.horizontal, 18)
-                .padding(.vertical, 8)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 6)
                 .background(
                     Capsule()
                         .fill(Color.accentColor.opacity(0.1))

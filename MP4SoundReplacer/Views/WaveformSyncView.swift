@@ -18,31 +18,31 @@ struct WaveformSyncView: View {
     @State private var scrollPosition: Double = 0
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             // ヘッダー
             headerView
 
             if isExpanded {
                 // ズームコントロール
                 zoomControlSection
-                    .padding(.horizontal, 4)
+                    .padding(.horizontal, 2)
 
                 // 波形表示エリア
                 waveformSection
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 4)
 
                 // 区切り線
                 Rectangle()
                     .fill(Color.secondary.opacity(0.15))
                     .frame(height: 1)
-                    .padding(.horizontal, 4)
+                    .padding(.horizontal, 2)
 
                 // 同期コントロール
                 syncControlSection
-                    .padding(.horizontal, 4)
+                    .padding(.horizontal, 2)
             }
         }
-        .padding(20)
+        .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 16)
                 .fill(Color(NSColor.controlBackgroundColor))
@@ -54,10 +54,10 @@ struct WaveformSyncView: View {
     // MARK: - Header
 
     private var headerView: some View {
-        HStack(spacing: 12) {
-            HStack(spacing: 8) {
+        HStack(spacing: 10) {
+            HStack(spacing: 6) {
                 Image(systemName: "waveform.badge.magnifyingglass")
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(
                         LinearGradient(
                             colors: [Color.accentColor, Color.accentColor.opacity(0.7)],
@@ -67,7 +67,7 @@ struct WaveformSyncView: View {
                     )
 
                 Text("音声同期")
-                    .font(.system(size: 18, weight: .bold))
+                    .font(.system(size: 16, weight: .bold))
             }
 
             Spacer()
@@ -152,13 +152,17 @@ struct WaveformSyncView: View {
                 }
             }
 
-            // リセットボタン
-            Button("リセット") {
+            // ズームリセットボタン
+            Button(action: {
                 zoomLevel = 1.0
                 scrollPosition = 0
+            }) {
+                Image(systemName: "arrow.counterclockwise")
+                    .font(.system(size: 11, weight: .semibold))
             }
             .buttonStyle(.bordered)
             .disabled(zoomLevel == 1.0 && scrollPosition == 0)
+            .help("ズームをリセット")
         }
     }
 
@@ -218,9 +222,9 @@ struct WaveformSyncView: View {
     // MARK: - Sync Control Section
 
     private var syncControlSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
             // 自動同期ボタン
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 Button(action: {
                     Task {
                         guard let videoURL = videoURL, let audioURL = audioURL else { return }
