@@ -154,7 +154,8 @@ struct WaveformSyncView: View {
                 zoomLevel: $zoomLevel,
                 scrollPosition: $scrollPosition,
                 isDraggable: false,
-                offsetSeconds: .constant(0)
+                offsetSeconds: .constant(0),
+                maxDuration: maxDuration
             )
 
             // 置換音声波形（ドラッグ可能）
@@ -166,7 +167,8 @@ struct WaveformSyncView: View {
                 zoomLevel: $zoomLevel,
                 scrollPosition: $scrollPosition,
                 isDraggable: true,
-                offsetSeconds: $offsetSeconds
+                offsetSeconds: $offsetSeconds,
+                maxDuration: maxDuration
             )
             .onChange(of: offsetSeconds) { newValue in
                 onOffsetChanged(newValue)
@@ -240,7 +242,7 @@ struct WaveformSyncView: View {
 
             // 操作ヒント
             if syncViewModel.videoWaveform != nil && syncViewModel.audioWaveform != nil {
-                Text("ヒント: マウスホイールでズーム、緑の波形をドラッグしてオフセット調整")
+                Text("ヒント: マウスホイールでズーム、Shift+ホイールまたは横スワイプでスクロール、緑の波形をドラッグしてオフセット調整")
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }

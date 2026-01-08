@@ -6,54 +6,69 @@ struct ContentView: View {
     @StateObject private var syncViewModel = SyncAnalyzerViewModel()
 
     var body: some View {
-        VStack(spacing: 20) {
-            // ヘッダー
-            headerView
+        ScrollView {
+            VStack(spacing: 16) {
+                // ヘッダー
+                headerView
 
-            // ファイルドロップゾーン
-            fileDropZonesView
+                // 上部セクション: ファイルドロップゾーン + エクスポート設定を横並び
+                topSection
 
-            // 波形同期（ファイル設定後に表示）
-            if viewModel.project.isReady {
-                WaveformSyncView(
-                    syncViewModel: syncViewModel,
-                    offsetSeconds: $viewModel.project.exportSettings.offsetSeconds,
-                    videoURL: viewModel.project.videoFile?.url,
-                    audioURL: viewModel.project.audioFile?.url,
-                    onOffsetChanged: { newOffset in
-                        viewModel.project.exportSettings.offsetSeconds = newOffset
-                    }
-                )
+                // 波形同期（ファイル設定後に表示）
+                if viewModel.project.isReady {
+                    WaveformSyncView(
+                        syncViewModel: syncViewModel,
+                        offsetSeconds: $viewModel.project.exportSettings.offsetSeconds,
+                        videoURL: viewModel.project.videoFile?.url,
+                        audioURL: viewModel.project.audioFile?.url,
+                        onOffsetChanged: { newOffset in
+                            viewModel.project.exportSettings.offsetSeconds = newOffset
+                        }
+                    )
+                }
+
+                // アクションボタン
+                actionButtonsView
+
+                // プログレス表示
+                if case .exporting(let progress) = viewModel.project.state {
+                    ProgressView(value: progress)
+                        .progressViewStyle(.linear)
+                }
+
+                // エラー表示
+                if case .error(let message) = viewModel.project.state {
+                    errorView(message)
+                }
+
+                // 完了表示
+                if case .completed(let url) = viewModel.project.state {
+                    completedView(url)
+                }
             }
-
-            // エクスポート設定
-            if viewModel.project.isReady {
-                ExportSettingsView(settings: $viewModel.project.exportSettings)
-            }
-
-            Spacer()
-
-            // アクションボタン
-            actionButtonsView
-
-            // プログレス表示
-            if case .exporting(let progress) = viewModel.project.state {
-                ProgressView(value: progress)
-                    .progressViewStyle(.linear)
-            }
-
-            // エラー表示
-            if case .error(let message) = viewModel.project.state {
-                errorView(message)
-            }
-
-            // 完了表示
-            if case .completed(let url) = viewModel.project.state {
-                completedView(url)
+            .padding()
+        }
+        .frame(minWidth: 800, minHeight: 500)
+        // 自動波形表示: 両方のファイルがセットされたら自動的に波形を生成
+        .onChange(of: viewModel.project.isReady) { isReady in
+            if isReady {
+                autoGenerateWaveforms()
             }
         }
-        .padding()
-        .frame(minWidth: 600, minHeight: 500)
+    }
+
+    /// 自動波形生成
+    private func autoGenerateWaveforms() {
+        guard let videoURL = viewModel.project.videoFile?.url,
+              let audioURL = viewModel.project.audioFile?.url else {
+            return
+        }
+        // 波形がまだ生成されていない場合のみ実行
+        if syncViewModel.videoWaveform == nil || syncViewModel.audioWaveform == nil {
+            Task {
+                await syncViewModel.generateWaveforms(videoURL: videoURL, audioURL: audioURL)
+            }
+        }
     }
 
     /// ヘッダー
@@ -93,23 +108,35 @@ struct ContentView: View {
         }
     }
 
-    /// ファイルドロップゾーン
-    private var fileDropZonesView: some View {
-        HStack(spacing: 16) {
+    /// 上部セクション: ファイルドロップゾーン + エクスポート設定
+    private var topSection: some View {
+        HStack(alignment: .top, spacing: 16) {
+            // 動画ファイル
             VideoDropZone(file: viewModel.project.videoFile) { url in
                 if url.path.isEmpty {
                     viewModel.clearVideoFile()
+                    syncViewModel.reset()
                 } else {
                     viewModel.setVideoFile(url: url)
                 }
             }
+            .frame(minWidth: 200)
 
+            // 音声ファイル
             AudioDropZone(file: viewModel.project.audioFile) { url in
                 if url.path.isEmpty {
                     viewModel.clearAudioFile()
+                    syncViewModel.reset()
                 } else {
                     viewModel.setAudioFile(url: url)
                 }
+            }
+            .frame(minWidth: 200)
+
+            // エクスポート設定（ファイル設定後に表示）
+            if viewModel.project.isReady {
+                ExportSettingsView(settings: $viewModel.project.exportSettings)
+                    .frame(minWidth: 280)
             }
         }
     }
@@ -119,6 +146,7 @@ struct ContentView: View {
         HStack {
             Button("リセット") {
                 viewModel.reset()
+                syncViewModel.reset()
             }
             .buttonStyle(.bordered)
             .disabled(viewModel.project.state.isProcessing)

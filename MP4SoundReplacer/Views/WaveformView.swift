@@ -19,8 +19,11 @@ struct ZoomableWaveformView: View {
     /// オフセット値（ドラッグ時に更新）
     @Binding var offsetSeconds: Double
 
-    /// ドラッグ中の一時オフセット
-    @State private var dragOffset: CGFloat = 0
+    /// 最大表示時間（スクロール制限用）
+    var maxDuration: TimeInterval = 0
+
+    /// ドラッグ中の一時オフセット（秒単位）
+    @State private var dragOffsetSeconds: Double = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -69,16 +72,25 @@ struct ZoomableWaveformView: View {
         return ZStack {
             if let waveform = waveform {
                 // 表示範囲の計算
-                let visibleDuration = duration / zoomLevel
-                let startTime = scrollPosition
+                let effectiveDuration = maxDuration > 0 ? maxDuration : duration
+                let visibleDuration = effectiveDuration / zoomLevel
+
+                // ドラッグ可能な波形はオフセットを考慮して表示位置を調整
+                let totalOffset = isDraggable ? (offsetSeconds + dragOffsetSeconds) : 0
+                let adjustedStartTime = scrollPosition - totalOffset
+                let startTime = max(0, adjustedStartTime)
                 let endTime = min(startTime + visibleDuration, duration)
 
                 // サンプルの取得
                 let samples = waveform.samples(from: startTime, to: endTime)
                 let downsampled = downsample(samples, to: Int(width))
 
+                // オフセットによるピクセル位置の調整
+                let pixelsPerSecond = width / visibleDuration
+                let pixelOffset = isDraggable ? (totalOffset * pixelsPerSecond) : 0
+
                 WaveformCanvas(samples: downsampled, color: color)
-                    .offset(x: isDraggable ? dragOffset : 0)
+                    .offset(x: pixelOffset)
                     .gesture(isDraggable ? dragGesture(width: width) : nil)
             } else {
                 // プレースホルダー
@@ -92,31 +104,43 @@ struct ZoomableWaveformView: View {
             }
         }
         .frame(height: 60)
-        .onScrollGesture { delta in
-            handleScrollZoom(delta: delta)
+        .clipped()
+        .onScrollGesture { delta, event in
+            handleScroll(delta: delta, event: event, width: width)
         }
     }
 
     private func dragGesture(width: CGFloat) -> some Gesture {
         DragGesture()
             .onChanged { value in
-                dragOffset = value.translation.width
-            }
-            .onEnded { value in
-                // ドラッグ距離を秒に変換
-                let visibleDuration = duration / zoomLevel
+                // ドラッグ距離を秒に変換（一時的なオフセット）
+                let effectiveDuration = maxDuration > 0 ? maxDuration : duration
+                let visibleDuration = effectiveDuration / zoomLevel
                 let secondsPerPixel = visibleDuration / Double(width)
-                let deltaSeconds = Double(value.translation.width) * secondsPerPixel
-
-                offsetSeconds += deltaSeconds
-                dragOffset = 0
+                dragOffsetSeconds = Double(value.translation.width) * secondsPerPixel
+            }
+            .onEnded { _ in
+                // ドラッグ完了時にオフセットを確定
+                offsetSeconds += dragOffsetSeconds
+                dragOffsetSeconds = 0
             }
     }
 
-    private func handleScrollZoom(delta: CGFloat) {
-        let zoomFactor = 1.0 + Double(delta) * 0.01
-        let newZoom = max(1.0, min(100.0, zoomLevel * zoomFactor))
-        zoomLevel = newZoom
+    private func handleScroll(delta: CGFloat, event: NSEvent, width: CGFloat) {
+        // Shiftキーでスクロール、通常はズーム
+        if event.modifierFlags.contains(.shift) || abs(event.deltaX) > abs(event.deltaY) {
+            // 水平スクロール
+            let effectiveDuration = maxDuration > 0 ? maxDuration : duration
+            let visibleDuration = effectiveDuration / zoomLevel
+            let scrollDelta = Double(event.deltaX) * visibleDuration * 0.01
+            let maxScroll = max(0, effectiveDuration - visibleDuration)
+            scrollPosition = max(0, min(maxScroll, scrollPosition - scrollDelta))
+        } else {
+            // ズーム
+            let zoomFactor = 1.0 + Double(delta) * 0.01
+            let newZoom = max(1.0, min(100.0, zoomLevel * zoomFactor))
+            zoomLevel = newZoom
+        }
     }
 
     private func downsample(_ samples: [Float], to targetCount: Int) -> [Float] {
@@ -247,7 +271,7 @@ struct TimelineView: View {
 
 /// スクロールジェスチャーのビューモディファイア
 struct ScrollGestureModifier: ViewModifier {
-    let action: (CGFloat) -> Void
+    let action: (CGFloat, NSEvent) -> Void
 
     func body(content: Content) -> some View {
         content.background(
@@ -258,7 +282,7 @@ struct ScrollGestureModifier: ViewModifier {
 
 /// NSViewを使ったスクロールジェスチャー検出
 struct ScrollGestureView: NSViewRepresentable {
-    let action: (CGFloat) -> Void
+    let action: (CGFloat, NSEvent) -> Void
 
     func makeNSView(context: Context) -> NSView {
         let view = ScrollDetectorView()
@@ -273,16 +297,16 @@ struct ScrollGestureView: NSViewRepresentable {
     }
 
     class ScrollDetectorView: NSView {
-        var action: ((CGFloat) -> Void)?
+        var action: ((CGFloat, NSEvent) -> Void)?
 
         override func scrollWheel(with event: NSEvent) {
-            action?(event.deltaY)
+            action?(event.deltaY, event)
         }
     }
 }
 
 extension View {
-    func onScrollGesture(action: @escaping (CGFloat) -> Void) -> some View {
+    func onScrollGesture(action: @escaping (CGFloat, NSEvent) -> Void) -> some View {
         modifier(ScrollGestureModifier(action: action))
     }
 }
@@ -368,7 +392,8 @@ struct WaveformView: View {
             zoomLevel: .constant(1.0),
             scrollPosition: .constant(0),
             isDraggable: false,
-            offsetSeconds: .constant(0)
+            offsetSeconds: .constant(0),
+            maxDuration: waveform?.duration ?? 0
         )
     }
 }
@@ -387,7 +412,8 @@ struct WaveformView: View {
             zoomLevel: .constant(2.0),
             scrollPosition: .constant(0),
             isDraggable: false,
-            offsetSeconds: .constant(0)
+            offsetSeconds: .constant(0),
+            maxDuration: 120.5
         )
 
         ZoomableWaveformView(
@@ -402,7 +428,8 @@ struct WaveformView: View {
             zoomLevel: .constant(2.0),
             scrollPosition: .constant(0),
             isDraggable: true,
-            offsetSeconds: .constant(0.5)
+            offsetSeconds: .constant(0.5),
+            maxDuration: 120.5
         )
     }
     .padding()
