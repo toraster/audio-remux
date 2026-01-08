@@ -4,7 +4,7 @@ import PackageDescription
 let package = Package(
     name: "MP4SoundReplacer",
     platforms: [
-        .macOS(.v11)
+        .macOS(.v12)
     ],
     targets: [
         .executableTarget(

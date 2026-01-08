@@ -5,13 +5,17 @@ struct ContentView: View {
     @StateObject private var viewModel = ProjectViewModel()
     @StateObject private var syncViewModel = SyncAnalyzerViewModel()
 
+    /// ファイル差し替え確認ダイアログの状態
+    @State private var showReplaceConfirmation = false
+    @State private var pendingFileAction: (() -> Void)?
+
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
                 // ヘッダー
                 headerView
 
-                // 上部セクション: ファイルドロップゾーン + エクスポート設定を横並び
+                // 上部セクション: ファイルドロップゾーン + エクスポート設定を横並び（50/50）
                 topSection
 
                 // 波形同期（常に表示、無効状態で）
@@ -22,6 +26,9 @@ struct ContentView: View {
                     audioURL: viewModel.project.audioFile?.url,
                     onOffsetChanged: { newOffset in
                         viewModel.project.exportSettings.offsetSeconds = newOffset
+                    },
+                    onResetOffset: {
+                        viewModel.project.exportSettings.offsetSeconds = 0
                     }
                 )
                 .disabled(!viewModel.project.isReady)
@@ -48,12 +55,28 @@ struct ContentView: View {
             }
             .padding()
         }
-        .frame(minWidth: 800, minHeight: 500)
+        .frame(minWidth: 800, minHeight: 600)
         // 自動波形表示: 両方のファイルがセットされたら自動的に波形を生成
         .onChange(of: viewModel.project.isReady) { isReady in
             if isReady {
                 autoGenerateWaveforms()
             }
+        }
+        // ファイル差し替え確認ダイアログ
+        .alert("ファイルを差し替えますか？", isPresented: $showReplaceConfirmation) {
+            Button("キャンセル", role: .cancel) {
+                pendingFileAction = nil
+            }
+            Button("差し替える", role: .destructive) {
+                // 設定をリセット
+                viewModel.project.exportSettings.offsetSeconds = 0
+                syncViewModel.reset()
+                // ファイルを設定
+                pendingFileAction?()
+                pendingFileAction = nil
+            }
+        } message: {
+            Text("現在の波形とオフセット設定がリセットされます。")
         }
     }
 
@@ -63,11 +86,27 @@ struct ContentView: View {
               let audioURL = viewModel.project.audioFile?.url else {
             return
         }
-        // 波形がまだ生成されていない場合のみ実行
-        if syncViewModel.videoWaveform == nil || syncViewModel.audioWaveform == nil {
-            Task {
-                await syncViewModel.generateWaveforms(videoURL: videoURL, audioURL: audioURL)
-            }
+        Task {
+            await syncViewModel.generateWaveforms(videoURL: videoURL, audioURL: audioURL)
+        }
+    }
+
+    /// ファイル設定（差し替え時は確認ダイアログを表示）
+    private func setVideoFile(url: URL) {
+        if viewModel.project.videoFile != nil {
+            pendingFileAction = { viewModel.setVideoFile(url: url) }
+            showReplaceConfirmation = true
+        } else {
+            viewModel.setVideoFile(url: url)
+        }
+    }
+
+    private func setAudioFile(url: URL) {
+        if viewModel.project.audioFile != nil {
+            pendingFileAction = { viewModel.setAudioFile(url: url) }
+            showReplaceConfirmation = true
+        } else {
+            viewModel.setAudioFile(url: url)
         }
     }
 
@@ -84,7 +123,7 @@ struct ContentView: View {
                     .fontWeight(.bold)
 
                 Text("動画の音声を無劣化で差し替え")
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundColor(.secondary)
             }
 
@@ -103,41 +142,46 @@ struct ContentView: View {
                 .frame(width: 8, height: 8)
 
             Text(viewModel.isFFmpegAvailable ? "FFmpeg OK" : "FFmpeg未設定")
-                .font(.caption)
+                .font(.callout)
                 .foregroundColor(.secondary)
         }
     }
 
-    /// 上部セクション: ファイルドロップゾーン + エクスポート設定
+    /// 上部セクション: ファイルドロップゾーン + エクスポート設定（50/50レイアウト）
     private var topSection: some View {
-        HStack(alignment: .top, spacing: 16) {
-            // 左側: ファイルドロップゾーン（縦並び）
-            VStack(spacing: 12) {
-                VideoDropZone(file: viewModel.project.videoFile) { url in
-                    if url.path.isEmpty {
-                        viewModel.clearVideoFile()
-                        syncViewModel.reset()
-                    } else {
-                        viewModel.setVideoFile(url: url)
+        GeometryReader { geometry in
+            let halfWidth = (geometry.size.width - 16) / 2
+            HStack(alignment: .top, spacing: 16) {
+                // 左側: ファイルドロップゾーン（縦並び）
+                VStack(spacing: 12) {
+                    VideoDropZone(file: viewModel.project.videoFile) { url in
+                        if url.path.isEmpty {
+                            viewModel.clearVideoFile()
+                            syncViewModel.reset()
+                        } else {
+                            setVideoFile(url: url)
+                        }
                     }
-                }
 
-                AudioDropZone(file: viewModel.project.audioFile) { url in
-                    if url.path.isEmpty {
-                        viewModel.clearAudioFile()
-                        syncViewModel.reset()
-                    } else {
-                        viewModel.setAudioFile(url: url)
+                    AudioDropZone(file: viewModel.project.audioFile) { url in
+                        if url.path.isEmpty {
+                            viewModel.clearAudioFile()
+                            syncViewModel.reset()
+                        } else {
+                            setAudioFile(url: url)
+                        }
                     }
                 }
+                .frame(width: halfWidth)
+
+                // 右側: エクスポート設定（常に表示、無効状態で）
+                ExportSettingsView(settings: $viewModel.project.exportSettings)
+                    .disabled(!viewModel.project.isReady)
+                    .opacity(viewModel.project.isReady ? 1.0 : 0.5)
+                    .frame(width: halfWidth)
             }
-            .frame(width: 280)
-
-            // 右側: エクスポート設定（常に表示、無効状態で）
-            ExportSettingsView(settings: $viewModel.project.exportSettings)
-                .disabled(!viewModel.project.isReady)
-                .opacity(viewModel.project.isReady ? 1.0 : 0.5)
         }
+        .frame(height: 280)
     }
 
     /// アクションボタン
@@ -167,7 +211,7 @@ struct ContentView: View {
                 .foregroundColor(.red)
 
             Text(message)
-                .font(.caption)
+                .font(.callout)
                 .foregroundColor(.red)
 
             Spacer()
@@ -186,11 +230,11 @@ struct ContentView: View {
                 .foregroundColor(.green)
 
             Text("エクスポート完了")
-                .font(.caption)
+                .font(.callout)
                 .fontWeight(.medium)
 
             Text(url.lastPathComponent)
-                .font(.caption)
+                .font(.callout)
                 .foregroundColor(.secondary)
 
             Spacer()

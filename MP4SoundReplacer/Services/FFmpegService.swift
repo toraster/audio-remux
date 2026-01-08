@@ -63,7 +63,7 @@ class FFmpegService {
     ///   - audioURL: 入力音声URL
     ///   - outputURL: 出力URL
     ///   - settings: エクスポート設定
-    ///   - videoDuration: 動画の長さ（秒）- フェード適用時に使用
+    ///   - videoDuration: 動画の長さ（秒）- 出力長の制御とフェード適用に使用
     func buildReplaceAudioArguments(
         videoURL: URL,
         audioURL: URL,
@@ -105,10 +105,17 @@ class FFmpegService {
             "-map", "0:v",
             "-map", "1:a",
             "-c:v", "copy",
-            "-c:a", settings.audioCodec.rawValue,
-            "-shortest",
-            outputURL.path
+            "-c:a", settings.audioCodec.rawValue
         ]
+
+        // 負のオフセット時は動画の長さを明示的に指定（-shortestだと音声が短くなった分だけ動画も短くなる）
+        if settings.offsetSeconds < 0, let duration = videoDuration {
+            args += ["-t", String(format: "%.3f", duration)]
+        } else {
+            args += ["-shortest"]
+        }
+
+        args += [outputURL.path]
 
         return args
     }
@@ -198,9 +205,16 @@ class FFmpegService {
         settings: ExportSettings,
         progressHandler: ((Double) -> Void)? = nil
     ) async throws {
-        // フェード適用のため動画の長さを取得
+        // 動画の長さを取得（フェード適用および負のオフセット時の出力長制御に使用）
         var videoDuration: Double?
-        if settings.autoFadeEnabled {
+        if settings.offsetSeconds < 0 {
+            // 負のオフセット時は duration が必須（-shortestだと動画が短くなるため）
+            let mediaFile = try await FFprobeService.shared.getMediaInfo(url: videoURL)
+            guard let duration = mediaFile.duration else {
+                throw FFmpegError.executionFailed("動画の長さを取得できませんでした。負のオフセットを使用するには動画の長さが必要です。")
+            }
+            videoDuration = duration
+        } else if settings.autoFadeEnabled {
             let mediaFile = try? await FFprobeService.shared.getMediaInfo(url: videoURL)
             videoDuration = mediaFile?.duration
         }
