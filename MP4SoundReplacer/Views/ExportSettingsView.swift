@@ -4,18 +4,6 @@ import SwiftUI
 struct ExportSettingsView: View {
     @Binding var settings: ExportSettings
 
-    /// オフセット値のテキストバインディング
-    private var offsetBinding: Binding<String> {
-        Binding(
-            get: { String(format: "%.3f", settings.offsetSeconds) },
-            set: { newValue in
-                if let value = Double(newValue) {
-                    settings.offsetSeconds = value
-                }
-            }
-        )
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("出力設定")
@@ -48,43 +36,33 @@ struct ExportSettingsView: View {
                     .font(.subheadline)
                     .foregroundColor(.secondary)
 
+                // オフセット値表示（大きく中央に）
                 HStack {
-                    TextField("0.000", text: offsetBinding)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 100)
-
+                    Text(String(format: "%+.3f", settings.offsetSeconds))
+                        .font(.system(size: 24, weight: .medium, design: .monospaced))
                     Text("秒")
-
-                    Spacer()
-
-                    // 微調整ボタン
-                    HStack(spacing: 4) {
-                        Button("-0.1") {
-                            settings.offsetSeconds -= 0.1
-                        }
-                        .buttonStyle(.bordered)
-
-                        Button("-0.01") {
-                            settings.offsetSeconds -= 0.01
-                        }
-                        .buttonStyle(.bordered)
-
-                        Button("+0.01") {
-                            settings.offsetSeconds += 0.01
-                        }
-                        .buttonStyle(.bordered)
-
-                        Button("+0.1") {
-                            settings.offsetSeconds += 0.1
-                        }
-                        .buttonStyle(.bordered)
-
-                        Button("リセット") {
-                            settings.offsetSeconds = 0
-                        }
-                        .buttonStyle(.bordered)
-                    }
+                        .font(.headline)
                 }
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color(NSColor.textBackgroundColor))
+                )
+
+                // 微調整ボタン（横並び）
+                HStack(spacing: 4) {
+                    Button("-0.1") { settings.offsetSeconds -= 0.1 }
+                    Button("-0.01") { settings.offsetSeconds -= 0.01 }
+                    Button("+0.01") { settings.offsetSeconds += 0.01 }
+                    Button("+0.1") { settings.offsetSeconds += 0.1 }
+                }
+                .buttonStyle(.bordered)
+                .frame(maxWidth: .infinity)
+
+                Button("リセット") { settings.offsetSeconds = 0 }
+                    .buttonStyle(.bordered)
+                    .frame(maxWidth: .infinity)
 
                 Text(offsetDescription)
                     .font(.caption)

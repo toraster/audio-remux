@@ -14,18 +14,18 @@ struct ContentView: View {
                 // 上部セクション: ファイルドロップゾーン + エクスポート設定を横並び
                 topSection
 
-                // 波形同期（ファイル設定後に表示）
-                if viewModel.project.isReady {
-                    WaveformSyncView(
-                        syncViewModel: syncViewModel,
-                        offsetSeconds: $viewModel.project.exportSettings.offsetSeconds,
-                        videoURL: viewModel.project.videoFile?.url,
-                        audioURL: viewModel.project.audioFile?.url,
-                        onOffsetChanged: { newOffset in
-                            viewModel.project.exportSettings.offsetSeconds = newOffset
-                        }
-                    )
-                }
+                // 波形同期（常に表示、無効状態で）
+                WaveformSyncView(
+                    syncViewModel: syncViewModel,
+                    offsetSeconds: $viewModel.project.exportSettings.offsetSeconds,
+                    videoURL: viewModel.project.videoFile?.url,
+                    audioURL: viewModel.project.audioFile?.url,
+                    onOffsetChanged: { newOffset in
+                        viewModel.project.exportSettings.offsetSeconds = newOffset
+                    }
+                )
+                .disabled(!viewModel.project.isReady)
+                .opacity(viewModel.project.isReady ? 1.0 : 0.5)
 
                 // アクションボタン
                 actionButtonsView
@@ -133,10 +133,10 @@ struct ContentView: View {
             }
             .frame(width: 280)
 
-            // 右側: エクスポート設定（広く確保）
-            if viewModel.project.isReady {
-                ExportSettingsView(settings: $viewModel.project.exportSettings)
-            }
+            // 右側: エクスポート設定（常に表示、無効状態で）
+            ExportSettingsView(settings: $viewModel.project.exportSettings)
+                .disabled(!viewModel.project.isReady)
+                .opacity(viewModel.project.isReady ? 1.0 : 0.5)
         }
     }
 
