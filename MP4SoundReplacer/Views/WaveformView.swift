@@ -324,20 +324,39 @@ struct WaveformCanvas: View {
 
             ZStack {
                 // 背景
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(Color(NSColor.controlBackgroundColor).opacity(0.5))
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(NSColor.controlBackgroundColor).opacity(0.6),
+                                Color(NSColor.controlBackgroundColor).opacity(0.4)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(color.opacity(0.15), lineWidth: 1)
+                    )
 
                 // 中央線
                 Path { path in
-                    path.move(to: CGPoint(x: 0, y: centerY))
-                    path.addLine(to: CGPoint(x: width, y: centerY))
+                    path.move(to: CGPoint(x: 8, y: centerY))
+                    path.addLine(to: CGPoint(x: width - 8, y: centerY))
                 }
-                .stroke(color.opacity(0.3), lineWidth: 0.5)
+                .stroke(color.opacity(0.2), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
 
                 // 波形バー
                 if !samples.isEmpty {
                     WaveformBarsShape(samples: samples)
-                        .fill(color)
+                        .fill(
+                            LinearGradient(
+                                colors: [color, color.opacity(0.8)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
                 }
             }
         }
