@@ -18,50 +18,88 @@ struct WaveformSyncView: View {
     @State private var scrollPosition: Double = 0
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 16) {
             // ヘッダー
             headerView
 
             if isExpanded {
                 // ズームコントロール
                 zoomControlSection
+                    .padding(.horizontal, 4)
 
                 // 波形表示エリア
                 waveformSection
+                    .padding(.vertical, 8)
 
-                Divider()
+                // 区切り線
+                Rectangle()
+                    .fill(Color.secondary.opacity(0.15))
+                    .frame(height: 1)
+                    .padding(.horizontal, 4)
 
                 // 同期コントロール
                 syncControlSection
+                    .padding(.horizontal, 4)
             }
         }
-        .padding()
+        .padding(20)
         .background(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: 16)
                 .fill(Color(NSColor.controlBackgroundColor))
+                .shadow(color: Color.black.opacity(0.05), radius: 6, x: 0, y: 2)
         )
+        .animation(.easeInOut(duration: 0.3), value: isExpanded)
     }
 
     // MARK: - Header
 
     private var headerView: some View {
-        HStack {
-            Text("音声同期")
-                .font(.headline)
+        HStack(spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "waveform.badge.magnifyingglass")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [Color.accentColor, Color.accentColor.opacity(0.7)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+
+                Text("音声同期")
+                    .font(.system(size: 18, weight: .bold))
+            }
 
             Spacer()
 
             // 状態インジケーター
             if syncViewModel.syncState.isProcessing {
-                ProgressView()
-                    .scaleEffect(0.7)
-                Text(syncViewModel.syncState.statusMessage)
-                    .font(.callout)
-                    .foregroundColor(.secondary)
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .scaleEffect(0.7)
+                    Text(syncViewModel.syncState.statusMessage)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(Color.accentColor.opacity(0.08))
+                )
             }
 
+            // 展開/折りたたみボタン
             Button(action: { withAnimation { isExpanded.toggle() } }) {
-                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                ZStack {
+                    Circle()
+                        .fill(Color(NSColor.controlBackgroundColor))
+                        .frame(width: 30, height: 30)
+
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.secondary)
+                }
             }
             .buttonStyle(.plain)
         }
@@ -182,7 +220,7 @@ struct WaveformSyncView: View {
     private var syncControlSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             // 自動同期ボタン
-            HStack {
+            HStack(spacing: 12) {
                 Button(action: {
                     Task {
                         guard let videoURL = videoURL, let audioURL = audioURL else { return }
@@ -204,52 +242,123 @@ struct WaveformSyncView: View {
                         }
                     }
                 }) {
-                    HStack {
+                    HStack(spacing: 8) {
                         Image(systemName: "waveform.badge.magnifyingglass")
+                            .font(.system(size: 13, weight: .semibold))
                         Text("自動同期")
+                            .font(.system(size: 13, weight: .semibold))
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(
+                        LinearGradient(
+                            colors: [Color.accentColor, Color.accentColor.opacity(0.85)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .foregroundColor(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .shadow(color: Color.accentColor.opacity(0.3), radius: 6, x: 0, y: 3)
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.plain)
                 .disabled(videoURL == nil || audioURL == nil || syncViewModel.syncState.isProcessing)
+                .opacity((videoURL == nil || audioURL == nil || syncViewModel.syncState.isProcessing) ? 0.5 : 1.0)
 
                 // オフセットリセットボタン
                 Button(action: {
-                    onResetOffset()
-                }) {
-                    HStack {
-                        Image(systemName: "arrow.counterclockwise")
-                        Text("オフセットをリセット")
+                    withAnimation {
+                        onResetOffset()
                     }
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.counterclockwise")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text("オフセットをリセット")
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Color(NSColor.controlBackgroundColor))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+                            )
+                    )
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.plain)
                 .disabled(offsetSeconds == 0)
+                .opacity(offsetSeconds == 0 ? 0.5 : 1.0)
 
                 Spacer()
 
                 // 結果表示
                 if let result = syncViewModel.lastResult {
-                    VStack(alignment: .trailing, spacing: 2) {
+                    VStack(alignment: .trailing, spacing: 4) {
                         Text("検出: \(String(format: "%.3f", result.detectedOffset))秒")
-                            .font(.callout)
-                        Text(result.confidenceLevel.description)
-                            .font(.caption)
-                            .foregroundColor(confidenceColor(result.confidenceLevel))
+                            .font(.system(size: 13, weight: .semibold))
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(confidenceColor(result.confidenceLevel))
+                                .frame(width: 6, height: 6)
+                            Text(result.confidenceLevel.description)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(confidenceColor(result.confidenceLevel))
+                        }
                     }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(confidenceColor(result.confidenceLevel).opacity(0.1))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(confidenceColor(result.confidenceLevel).opacity(0.3), lineWidth: 1)
+                            )
+                    )
                 }
             }
 
             // 操作ヒント
             if syncViewModel.videoWaveform != nil && syncViewModel.audioWaveform != nil {
-                Text("ヒント: マウスホイールでズーム、Shift+ホイールまたは横スワイプでスクロール、緑の波形をドラッグしてオフセット調整")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                HStack(spacing: 6) {
+                    Image(systemName: "lightbulb.fill")
+                        .font(.system(size: 11))
+                        .foregroundColor(.yellow)
+                    Text("マウスホイールでズーム、Shift+ホイールまたは横スワイプでスクロール、緑の波形をドラッグしてオフセット調整")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.yellow.opacity(0.08))
+                )
             }
 
             // エラー表示
             if case .error(let message) = syncViewModel.syncState {
-                Text(message)
-                    .font(.callout)
-                    .foregroundColor(.red)
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(.red)
+                    Text(message)
+                        .font(.system(size: 12))
+                        .foregroundColor(.red)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.red.opacity(0.08))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.red.opacity(0.3), lineWidth: 1)
+                        )
+                )
             }
         }
     }

@@ -10,6 +10,7 @@ struct FileDropZone: View {
     let onDrop: (URL) -> Void
 
     @State private var isTargeted = false
+    @State private var isHovered = false
 
     var body: some View {
         VStack(spacing: 12) {
@@ -21,18 +22,60 @@ struct FileDropZone: View {
                 dropPromptView
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 120)
+        .frame(maxWidth: .infinity, minHeight: 130)
+        .padding(20)
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(isTargeted ? Color.accentColor.opacity(0.1) : Color(NSColor.controlBackgroundColor))
+            ZStack {
+                // ベース背景
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(NSColor.controlBackgroundColor))
+
+                // グラデーションオーバーレイ（ターゲット時）
+                if isTargeted {
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.accentColor.opacity(0.15),
+                                    Color.accentColor.opacity(0.05)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
+            }
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: 16)
                 .strokeBorder(
-                    isTargeted ? Color.accentColor : Color.gray.opacity(0.3),
-                    style: StrokeStyle(lineWidth: isTargeted ? 2 : 1, dash: file == nil ? [8] : [])
+                    isTargeted ?
+                        LinearGradient(
+                            colors: [Color.accentColor, Color.accentColor.opacity(0.7)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ) :
+                        LinearGradient(
+                            colors: [Color.secondary.opacity(0.2), Color.secondary.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                    style: StrokeStyle(
+                        lineWidth: isTargeted ? 2.5 : 1.5,
+                        dash: file == nil ? [12, 6] : []
+                    )
                 )
         )
+        .shadow(color: isTargeted ? Color.accentColor.opacity(0.2) : Color.black.opacity(0.05),
+                radius: isTargeted ? 12 : 6,
+                x: 0,
+                y: isTargeted ? 4 : 2)
+        .scaleEffect(isTargeted ? 1.02 : (isHovered ? 1.01 : 1.0))
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isTargeted)
+        .animation(.easeInOut(duration: 0.2), value: isHovered)
+        .onHover { hovering in
+            isHovered = hovering
+        }
         .onDrop(of: acceptedTypes, isTargeted: $isTargeted) { providers in
             handleDrop(providers: providers)
         }
@@ -40,55 +83,123 @@ struct FileDropZone: View {
 
     /// ドロップ待ち表示
     private var dropPromptView: some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.system(size: 48))
-                .foregroundColor(.accentColor)
+        VStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.accentColor.opacity(0.15),
+                                Color.accentColor.opacity(0.05)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 70, height: 70)
 
-            Text(title)
-                .font(.headline)
-
-            Text("ドラッグ&ドロップ")
-                .font(.callout)
-                .foregroundColor(.secondary)
-
-            Button("ファイルを選択...") {
-                selectFile()
+                Image(systemName: icon)
+                    .font(.system(size: 32, weight: .medium))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [Color.accentColor, Color.accentColor.opacity(0.7)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
             }
-            .buttonStyle(.bordered)
+
+            VStack(spacing: 4) {
+                Text(title)
+                    .font(.system(size: 16, weight: .semibold))
+
+                Text("ドラッグ&ドロップ または")
+                    .font(.system(size: 13))
+                    .foregroundColor(.secondary)
+            }
+
+            Button(action: {
+                selectFile()
+            }) {
+                HStack(spacing: 6) {
+                    Image(systemName: "doc.badge.plus")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text("ファイルを選択")
+                        .font(.system(size: 13, weight: .semibold))
+                }
+                .padding(.horizontal, 18)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule()
+                        .fill(Color.accentColor.opacity(0.1))
+                )
+                .overlay(
+                    Capsule()
+                        .stroke(Color.accentColor.opacity(0.3), lineWidth: 1)
+                )
+            }
+            .buttonStyle(.plain)
         }
-        .padding()
     }
 
     /// ファイル情報表示
     private func fileInfoView(_ file: MediaFile) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: file.isVideo ? "film" : "waveform")
-                    .font(.title2)
-                    .foregroundColor(.accentColor)
+        HStack(spacing: 12) {
+            // アイコン
+            ZStack {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.accentColor.opacity(0.15),
+                                Color.accentColor.opacity(0.08)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 50, height: 50)
 
+                Image(systemName: file.isVideo ? "film.fill" : "waveform")
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundColor(.accentColor)
+            }
+
+            // ファイル情報
+            VStack(alignment: .leading, spacing: 4) {
                 Text(file.fileName)
-                    .font(.headline)
+                    .font(.system(size: 14, weight: .semibold))
                     .lineLimit(1)
                     .truncationMode(.middle)
 
-                Spacer()
-
-                Button(action: { onDrop(URL(fileURLWithPath: "")) }) {
-                    Image(systemName: "xmark.circle.fill")
+                if !file.summary.isEmpty {
+                    Text(file.summary)
+                        .font(.system(size: 12))
                         .foregroundColor(.secondary)
+                        .lineLimit(1)
                 }
-                .buttonStyle(.plain)
             }
 
-            if !file.summary.isEmpty {
-                Text(file.summary)
-                    .font(.callout)
-                    .foregroundColor(.secondary)
+            Spacer()
+
+            // 削除ボタン
+            Button(action: {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    onDrop(URL(fileURLWithPath: ""))
+                }
+            }) {
+                ZStack {
+                    Circle()
+                        .fill(Color.red.opacity(0.1))
+                        .frame(width: 28, height: 28)
+
+                    Image(systemName: "xmark")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(.red.opacity(0.8))
+                }
             }
+            .buttonStyle(.plain)
         }
-        .padding()
     }
 
     /// ドロップハンドラ
