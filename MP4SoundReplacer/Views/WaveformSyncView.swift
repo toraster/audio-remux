@@ -10,12 +10,21 @@ struct WaveformSyncView: View {
 
     @State private var isExpanded = true
 
+    /// ズームレベル（1.0 = 全体表示、100.0 = 最大ズーム）
+    @State private var zoomLevel: Double = 1.0
+
+    /// 表示開始位置（秒）
+    @State private var scrollPosition: Double = 0
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // ヘッダー
             headerView
 
             if isExpanded {
+                // ズームコントロール
+                zoomControlSection
+
                 // 波形表示エリア
                 waveformSection
 
@@ -57,24 +66,111 @@ struct WaveformSyncView: View {
         }
     }
 
+    // MARK: - Zoom Control Section
+
+    private var zoomControlSection: some View {
+        HStack(spacing: 12) {
+            // ズームスライダー
+            HStack(spacing: 4) {
+                Image(systemName: "minus.magnifyingglass")
+                    .foregroundColor(.secondary)
+                    .font(.caption)
+
+                Slider(value: $zoomLevel, in: 1...100) { _ in }
+                    .frame(width: 150)
+
+                Image(systemName: "plus.magnifyingglass")
+                    .foregroundColor(.secondary)
+                    .font(.caption)
+            }
+
+            Text("\(Int(zoomLevel))x")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .frame(width: 35, alignment: .leading)
+
+            Spacer()
+
+            // スクロール位置（ズーム中のみ表示）
+            if zoomLevel > 1 {
+                HStack(spacing: 4) {
+                    Button(action: { scrollPosition = max(0, scrollPosition - scrollStep) }) {
+                        Image(systemName: "chevron.left")
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(scrollPosition <= 0)
+
+                    Text(formatTime(scrollPosition))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .frame(width: 60)
+
+                    Button(action: { scrollPosition = min(maxScrollPosition, scrollPosition + scrollStep) }) {
+                        Image(systemName: "chevron.right")
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(scrollPosition >= maxScrollPosition)
+                }
+            }
+
+            // リセットボタン
+            Button("リセット") {
+                zoomLevel = 1.0
+                scrollPosition = 0
+            }
+            .buttonStyle(.bordered)
+            .disabled(zoomLevel == 1.0 && scrollPosition == 0)
+        }
+    }
+
+    private var scrollStep: Double {
+        let visibleDuration = maxDuration / zoomLevel
+        return visibleDuration * 0.25
+    }
+
+    private var maxScrollPosition: Double {
+        let visibleDuration = maxDuration / zoomLevel
+        return max(0, maxDuration - visibleDuration)
+    }
+
+    private var maxDuration: Double {
+        max(
+            syncViewModel.videoWaveform?.duration ?? 0,
+            syncViewModel.audioWaveform?.duration ?? 0,
+            1.0
+        )
+    }
+
     // MARK: - Waveform Section
 
     private var waveformSection: some View {
         VStack(spacing: 8) {
             // 元動画の音声波形
-            WaveformView(
+            ZoomableWaveformView(
                 waveform: syncViewModel.videoWaveform,
                 color: .blue,
-                label: "元動画の音声"
+                label: "元動画の音声",
+                duration: syncViewModel.videoWaveform?.duration ?? maxDuration,
+                zoomLevel: $zoomLevel,
+                scrollPosition: $scrollPosition,
+                isDraggable: false,
+                offsetSeconds: .constant(0)
             )
 
-            // 置換音声波形
-            WaveformView(
+            // 置換音声波形（ドラッグ可能）
+            ZoomableWaveformView(
                 waveform: syncViewModel.audioWaveform,
                 color: .green,
-                label: "置換音声",
-                offset: offsetSeconds
+                label: "置換音声（ドラッグで調整可能）",
+                duration: syncViewModel.audioWaveform?.duration ?? maxDuration,
+                zoomLevel: $zoomLevel,
+                scrollPosition: $scrollPosition,
+                isDraggable: true,
+                offsetSeconds: $offsetSeconds
             )
+            .onChange(of: offsetSeconds) { newValue in
+                onOffsetChanged(newValue)
+            }
         }
     }
 
@@ -142,6 +238,13 @@ struct WaveformSyncView: View {
                 }
             }
 
+            // 操作ヒント
+            if syncViewModel.videoWaveform != nil && syncViewModel.audioWaveform != nil {
+                Text("ヒント: マウスホイールでズーム、緑の波形をドラッグしてオフセット調整")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+
             // エラー表示
             if case .error(let message) = syncViewModel.syncState {
                 Text(message)
@@ -159,6 +262,16 @@ struct WaveformSyncView: View {
             return .orange
         case .low:
             return .red
+        }
+    }
+
+    private func formatTime(_ time: TimeInterval) -> String {
+        let minutes = Int(time) / 60
+        let seconds = time - Double(minutes * 60)
+        if minutes > 0 {
+            return String(format: "%d:%05.2f", minutes, seconds)
+        } else {
+            return String(format: "%.2fs", seconds)
         }
     }
 }
