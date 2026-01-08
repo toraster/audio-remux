@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 /// ファイルドロップゾーン
 struct FileDropZone: View {
     let title: String
+    let icon: String
     let acceptedTypes: [UTType]
     let file: MediaFile?
     let onDrop: (URL) -> Void
@@ -40,15 +41,15 @@ struct FileDropZone: View {
     /// ドロップ待ち表示
     private var dropPromptView: some View {
         VStack(spacing: 8) {
-            Image(systemName: "arrow.down.doc")
-                .font(.system(size: 32))
-                .foregroundColor(.secondary)
+            Image(systemName: icon)
+                .font(.system(size: 48))
+                .foregroundColor(.accentColor)
 
             Text(title)
                 .font(.headline)
 
             Text("ドラッグ&ドロップ")
-                .font(.caption)
+                .font(.callout)
                 .foregroundColor(.secondary)
 
             Button("ファイルを選択...") {
@@ -64,6 +65,7 @@ struct FileDropZone: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Image(systemName: file.isVideo ? "film" : "waveform")
+                    .font(.title2)
                     .foregroundColor(.accentColor)
 
                 Text(file.fileName)
@@ -82,7 +84,7 @@ struct FileDropZone: View {
 
             if !file.summary.isEmpty {
                 Text(file.summary)
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundColor(.secondary)
             }
         }
@@ -135,6 +137,7 @@ struct VideoDropZone: View {
     var body: some View {
         FileDropZone(
             title: "動画ファイル",
+            icon: "film.circle.fill",
             acceptedTypes: [.mpeg4Movie, .quickTimeMovie],
             file: file,
             onDrop: onDrop
@@ -150,6 +153,7 @@ struct AudioDropZone: View {
     var body: some View {
         FileDropZone(
             title: "音声ファイル",
+            icon: "waveform.circle.fill",
             acceptedTypes: [.wav, .aiff],
             file: file,
             onDrop: onDrop

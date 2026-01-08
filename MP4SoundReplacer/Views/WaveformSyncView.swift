@@ -7,6 +7,7 @@ struct WaveformSyncView: View {
     let videoURL: URL?
     let audioURL: URL?
     let onOffsetChanged: (Double) -> Void
+    let onResetOffset: () -> Void
 
     @State private var isExpanded = true
 
@@ -55,7 +56,7 @@ struct WaveformSyncView: View {
                 ProgressView()
                     .scaleEffect(0.7)
                 Text(syncViewModel.syncState.statusMessage)
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundColor(.secondary)
             }
 
@@ -85,9 +86,9 @@ struct WaveformSyncView: View {
             }
 
             Text("\(Int(zoomLevel))x")
-                .font(.caption)
+                .font(.callout)
                 .foregroundColor(.secondary)
-                .frame(width: 35, alignment: .leading)
+                .frame(width: 40, alignment: .leading)
 
             Spacer()
 
@@ -101,9 +102,9 @@ struct WaveformSyncView: View {
                     .disabled(scrollPosition <= 0)
 
                     Text(formatTime(scrollPosition))
-                        .font(.caption)
+                        .font(.callout)
                         .foregroundColor(.secondary)
-                        .frame(width: 60)
+                        .frame(width: 70)
 
                     Button(action: { scrollPosition = min(maxScrollPosition, scrollPosition + scrollStep) }) {
                         Image(systemName: "chevron.right")
@@ -154,7 +155,8 @@ struct WaveformSyncView: View {
                 zoomLevel: $zoomLevel,
                 scrollPosition: $scrollPosition,
                 isDraggable: false,
-                offsetSeconds: .constant(0)
+                offsetSeconds: .constant(0),
+                maxDuration: maxDuration
             )
 
             // 置換音声波形（ドラッグ可能）
@@ -166,7 +168,8 @@ struct WaveformSyncView: View {
                 zoomLevel: $zoomLevel,
                 scrollPosition: $scrollPosition,
                 isDraggable: true,
-                offsetSeconds: $offsetSeconds
+                offsetSeconds: $offsetSeconds,
+                maxDuration: maxDuration
             )
             .onChange(of: offsetSeconds) { newValue in
                 onOffsetChanged(newValue)
@@ -209,20 +212,17 @@ struct WaveformSyncView: View {
                 .buttonStyle(.bordered)
                 .disabled(videoURL == nil || audioURL == nil || syncViewModel.syncState.isProcessing)
 
-                // 波形生成のみ
+                // オフセットリセットボタン
                 Button(action: {
-                    Task {
-                        guard let videoURL = videoURL, let audioURL = audioURL else { return }
-                        await syncViewModel.generateWaveforms(videoURL: videoURL, audioURL: audioURL)
-                    }
+                    onResetOffset()
                 }) {
                     HStack {
-                        Image(systemName: "waveform")
-                        Text("波形を表示")
+                        Image(systemName: "arrow.counterclockwise")
+                        Text("オフセットをリセット")
                     }
                 }
                 .buttonStyle(.bordered)
-                .disabled(videoURL == nil || audioURL == nil || syncViewModel.syncState.isProcessing)
+                .disabled(offsetSeconds == 0)
 
                 Spacer()
 
@@ -230,9 +230,9 @@ struct WaveformSyncView: View {
                 if let result = syncViewModel.lastResult {
                     VStack(alignment: .trailing, spacing: 2) {
                         Text("検出: \(String(format: "%.3f", result.detectedOffset))秒")
-                            .font(.caption)
+                            .font(.callout)
                         Text(result.confidenceLevel.description)
-                            .font(.caption2)
+                            .font(.caption)
                             .foregroundColor(confidenceColor(result.confidenceLevel))
                     }
                 }
@@ -240,15 +240,15 @@ struct WaveformSyncView: View {
 
             // 操作ヒント
             if syncViewModel.videoWaveform != nil && syncViewModel.audioWaveform != nil {
-                Text("ヒント: マウスホイールでズーム、緑の波形をドラッグしてオフセット調整")
-                    .font(.caption2)
+                Text("ヒント: マウスホイールでズーム、Shift+ホイールまたは横スワイプでスクロール、緑の波形をドラッグしてオフセット調整")
+                    .font(.caption)
                     .foregroundColor(.secondary)
             }
 
             // エラー表示
             if case .error(let message) = syncViewModel.syncState {
                 Text(message)
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundColor(.red)
             }
         }
@@ -282,7 +282,8 @@ struct WaveformSyncView: View {
         offsetSeconds: .constant(0.0),
         videoURL: nil,
         audioURL: nil,
-        onOffsetChanged: { _ in }
+        onOffsetChanged: { _ in },
+        onResetOffset: { }
     )
     .padding()
     .frame(width: 600)
