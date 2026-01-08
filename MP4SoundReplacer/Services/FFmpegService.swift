@@ -63,7 +63,7 @@ class FFmpegService {
     ///   - audioURL: 入力音声URL
     ///   - outputURL: 出力URL
     ///   - settings: エクスポート設定
-    ///   - videoDuration: 動画の長さ（秒）- フェード適用時に使用
+    ///   - videoDuration: 動画の長さ（秒）- 出力長の制御とフェード適用に使用
     func buildReplaceAudioArguments(
         videoURL: URL,
         audioURL: URL,
@@ -73,18 +73,20 @@ class FFmpegService {
     ) -> [String] {
         var args = ["-y", "-hide_banner"]
 
-        // 正のオフセット: 音声を遅らせる
+        // 動画入力（常に最初）
+        args += ["-i", videoURL.path]
+
+        // 正のオフセット: 音声を遅らせる（-itsoffsetは音声入力の直前に配置）
         if settings.offsetSeconds > 0 {
             args += ["-itsoffset", String(format: "%.3f", settings.offsetSeconds)]
         }
 
-        args += ["-i", videoURL.path]
-
-        // 負のオフセット: 音声の先頭をカット
+        // 負のオフセット: 音声の先頭をカット（-ssは音声入力の直前に配置）
         if settings.offsetSeconds < 0 {
             args += ["-ss", String(format: "%.3f", -settings.offsetSeconds)]
         }
 
+        // 音声入力
         args += ["-i", audioURL.path]
 
         // フェードフィルターの構築
@@ -103,10 +105,17 @@ class FFmpegService {
             "-map", "0:v",
             "-map", "1:a",
             "-c:v", "copy",
-            "-c:a", settings.audioCodec.rawValue,
-            "-shortest",
-            outputURL.path
+            "-c:a", settings.audioCodec.rawValue
         ]
+
+        // 負のオフセット時は動画の長さを明示的に指定（-shortestだと音声が短くなった分だけ動画も短くなる）
+        if settings.offsetSeconds < 0, let duration = videoDuration {
+            args += ["-t", String(format: "%.3f", duration)]
+        } else {
+            args += ["-shortest"]
+        }
+
+        args += [outputURL.path]
 
         return args
     }
@@ -121,35 +130,69 @@ class FFmpegService {
             throw FFmpegError.binaryNotFound
         }
 
+        // stdout/stderrを同時並行で読み取り（デッドロック防止）
         return try await withCheckedThrowingContinuation { continuation in
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: path)
-            process.arguments = arguments
+            DispatchQueue.global(qos: .userInitiated).async {
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: path)
+                process.arguments = arguments
 
-            let outputPipe = Pipe()
-            let errorPipe = Pipe()
-            process.standardOutput = outputPipe
-            process.standardError = errorPipe
+                let outputPipe = Pipe()
+                let errorPipe = Pipe()
+                process.standardOutput = outputPipe
+                process.standardError = errorPipe
 
-            do {
-                try process.run()
-            } catch {
-                continuation.resume(throwing: FFmpegError.executionFailed(error.localizedDescription))
-                return
-            }
+                // 出力データを蓄積する変数
+                var outputData = Data()
+                var errorData = Data()
+                let dataLock = NSLock()
 
-            process.waitUntilExit()
+                // stdout を非同期で読み取り
+                outputPipe.fileHandleForReading.readabilityHandler = { handle in
+                    let data = handle.availableData
+                    if !data.isEmpty {
+                        dataLock.lock()
+                        outputData.append(data)
+                        dataLock.unlock()
+                    }
+                }
 
-            let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
-            let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+                // stderr を非同期で読み取り
+                errorPipe.fileHandleForReading.readabilityHandler = { handle in
+                    let data = handle.availableData
+                    if !data.isEmpty {
+                        dataLock.lock()
+                        errorData.append(data)
+                        dataLock.unlock()
+                    }
+                }
 
-            let output = String(data: outputData, encoding: .utf8) ?? ""
-            let errorOutput = String(data: errorData, encoding: .utf8) ?? ""
+                // プロセス終了時の処理
+                process.terminationHandler = { proc in
+                    // ハンドラをクリア
+                    outputPipe.fileHandleForReading.readabilityHandler = nil
+                    errorPipe.fileHandleForReading.readabilityHandler = nil
 
-            if process.terminationStatus != 0 {
-                continuation.resume(throwing: FFmpegError.executionFailed(errorOutput))
-            } else {
-                continuation.resume(returning: output)
+                    // 残りのデータを読み取り
+                    dataLock.lock()
+                    outputData.append(outputPipe.fileHandleForReading.readDataToEndOfFile())
+                    errorData.append(errorPipe.fileHandleForReading.readDataToEndOfFile())
+                    let finalOutput = String(data: outputData, encoding: .utf8) ?? ""
+                    let finalError = String(data: errorData, encoding: .utf8) ?? ""
+                    dataLock.unlock()
+
+                    if proc.terminationStatus != 0 {
+                        continuation.resume(throwing: FFmpegError.executionFailed(finalError))
+                    } else {
+                        continuation.resume(returning: finalOutput)
+                    }
+                }
+
+                do {
+                    try process.run()
+                } catch {
+                    continuation.resume(throwing: FFmpegError.executionFailed(error.localizedDescription))
+                }
             }
         }
     }
@@ -162,9 +205,16 @@ class FFmpegService {
         settings: ExportSettings,
         progressHandler: ((Double) -> Void)? = nil
     ) async throws {
-        // フェード適用のため動画の長さを取得
+        // 動画の長さを取得（フェード適用および負のオフセット時の出力長制御に使用）
         var videoDuration: Double?
-        if settings.autoFadeEnabled {
+        if settings.offsetSeconds < 0 {
+            // 負のオフセット時は duration が必須（-shortestだと動画が短くなるため）
+            let mediaFile = try await FFprobeService.shared.getMediaInfo(url: videoURL)
+            guard let duration = mediaFile.duration else {
+                throw FFmpegError.executionFailed("動画の長さを取得できませんでした。負のオフセットを使用するには動画の長さが必要です。")
+            }
+            videoDuration = duration
+        } else if settings.autoFadeEnabled {
             let mediaFile = try? await FFprobeService.shared.getMediaInfo(url: videoURL)
             videoDuration = mediaFile?.duration
         }
