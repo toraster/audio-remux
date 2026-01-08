@@ -24,7 +24,7 @@ struct ExportSettingsView: View {
                 .labelsHidden()
 
                 Text(settings.audioCodec.description)
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundColor(.secondary)
             }
 
@@ -65,7 +65,7 @@ struct ExportSettingsView: View {
                     .frame(maxWidth: .infinity)
 
                 Text(offsetDescription)
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundColor(.secondary)
             }
         }
