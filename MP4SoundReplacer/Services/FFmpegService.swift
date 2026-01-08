@@ -5,6 +5,7 @@ enum FFmpegError: LocalizedError {
     case binaryNotFound
     case executionFailed(String)
     case invalidOutput
+    case timeout(TimeInterval)
 
     var errorDescription: String? {
         switch self {
@@ -14,6 +15,8 @@ enum FFmpegError: LocalizedError {
             return "FFmpeg実行エラー: \(message)"
         case .invalidOutput:
             return "無効な出力です"
+        case .timeout(let seconds):
+            return "処理がタイムアウトしました（\(Int(seconds))秒）"
         }
     }
 }
@@ -120,27 +123,59 @@ class FFmpegService {
         return args
     }
 
+    /// デフォルトタイムアウト（秒）
+    static let defaultTimeout: TimeInterval = 60
+
     /// FFmpegコマンドを実行
+    /// - Parameters:
+    ///   - arguments: FFmpeg引数
+    ///   - progressHandler: 進捗ハンドラ（オプション）
+    ///   - timeout: タイムアウト秒数（デフォルト: 60秒）
     @discardableResult
     func execute(
         arguments: [String],
-        progressHandler: ((Double) -> Void)? = nil
+        progressHandler: ((Double) -> Void)? = nil,
+        timeout: TimeInterval = defaultTimeout
     ) async throws -> String {
         guard let path = ffmpegPath else {
             throw FFmpegError.binaryNotFound
         }
 
-        // stdout/stderrを同時並行で読み取り（デッドロック防止）
-        return try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: path)
-                process.arguments = arguments
+        return try await withThrowingTaskGroup(of: String.self) { group in
+            // メインの実行タスク
+            group.addTask {
+                try await self.executeProcess(path: path, arguments: arguments)
+            }
 
-                let outputPipe = Pipe()
-                let errorPipe = Pipe()
-                process.standardOutput = outputPipe
-                process.standardError = errorPipe
+            // タイムアウトタスク
+            group.addTask {
+                try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                throw FFmpegError.timeout(timeout)
+            }
+
+            // 最初に完了したタスクの結果を返す
+            let result = try await group.next()!
+            group.cancelAll()
+            return result
+        }
+    }
+
+    /// プロセスを実行して結果を返す（内部メソッド）
+    private func executeProcess(path: String, arguments: [String]) async throws -> String {
+        // プロセスを先に作成（キャンセルハンドラからアクセスするため）
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: path)
+        process.arguments = arguments
+
+        let outputPipe = Pipe()
+        let errorPipe = Pipe()
+        process.standardOutput = outputPipe
+        process.standardError = errorPipe
+
+        // タスクキャンセル時にプロセスを終了させる
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                let resumeOnce = OnceFlag()
 
                 // 出力データを蓄積する変数
                 var outputData = Data()
@@ -169,19 +204,29 @@ class FFmpegService {
 
                 // プロセス終了時の処理
                 process.terminationHandler = { proc in
-                    // ハンドラをクリア
+                    // まずハンドラをクリア（これ以上のコールバックを防ぐ）
                     outputPipe.fileHandleForReading.readabilityHandler = nil
                     errorPipe.fileHandleForReading.readabilityHandler = nil
 
-                    // 残りのデータを読み取り
+                    // 残りのデータを読み取り（ロック外で実行してデッドロック防止）
+                    let remainingOutput = outputPipe.fileHandleForReading.readDataToEndOfFile()
+                    let remainingError = errorPipe.fileHandleForReading.readDataToEndOfFile()
+
+                    // ロックを取得してデータを結合
                     dataLock.lock()
-                    outputData.append(outputPipe.fileHandleForReading.readDataToEndOfFile())
-                    errorData.append(errorPipe.fileHandleForReading.readDataToEndOfFile())
+                    outputData.append(remainingOutput)
+                    errorData.append(remainingError)
                     let finalOutput = String(data: outputData, encoding: .utf8) ?? ""
                     let finalError = String(data: errorData, encoding: .utf8) ?? ""
                     dataLock.unlock()
 
-                    if proc.terminationStatus != 0 {
+                    // 一度だけresumeを呼ぶ（二重呼び出し防止）
+                    guard resumeOnce.tryRun() else { return }
+
+                    // キャンセルによる終了か確認
+                    if Task.isCancelled {
+                        continuation.resume(throwing: CancellationError())
+                    } else if proc.terminationStatus != 0 {
                         continuation.resume(throwing: FFmpegError.executionFailed(finalError))
                     } else {
                         continuation.resume(returning: finalOutput)
@@ -191,8 +236,15 @@ class FFmpegService {
                 do {
                     try process.run()
                 } catch {
+                    // プロセス起動失敗時（terminationHandlerは呼ばれない）
+                    guard resumeOnce.tryRun() else { return }
                     continuation.resume(throwing: FFmpegError.executionFailed(error.localizedDescription))
                 }
+            }
+        } onCancel: {
+            // タスクがキャンセルされたらプロセスを終了
+            if process.isRunning {
+                process.terminate()
             }
         }
     }
@@ -275,5 +327,24 @@ class FFmpegService {
         ]
 
         try await execute(arguments: arguments)
+    }
+}
+
+// MARK: - Private Helpers
+
+extension FFmpegService {
+    /// スレッドセーフな1回限りの実行を保証するクラス
+    private final class OnceFlag: @unchecked Sendable {
+        private var _done = false
+        private let lock = NSLock()
+
+        /// 最初の呼び出しのみtrueを返し、以降はfalseを返す
+        func tryRun() -> Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            if _done { return false }
+            _done = true
+            return true
+        }
     }
 }
