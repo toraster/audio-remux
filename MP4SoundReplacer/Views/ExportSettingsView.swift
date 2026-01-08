@@ -5,11 +5,11 @@ struct ExportSettingsView: View {
     @Binding var settings: ExportSettings
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 14) {
             // ヘッダー
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 Image(systemName: "gear.circle.fill")
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(
                         LinearGradient(
                             colors: [Color.accentColor, Color.accentColor.opacity(0.7)],
@@ -19,11 +19,11 @@ struct ExportSettingsView: View {
                     )
 
                 Text("出力設定")
-                    .font(.system(size: 18, weight: .bold))
+                    .font(.system(size: 16, weight: .bold))
             }
 
             // 音声コーデック選択
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text("音声コーデック")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(.secondary)
@@ -58,7 +58,7 @@ struct ExportSettingsView: View {
                 .frame(height: 1)
 
             // オフセット設定
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text("音声オフセット")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(.secondary)
@@ -67,7 +67,7 @@ struct ExportSettingsView: View {
                 HStack(spacing: 4) {
                     Spacer()
                     Text(String(format: "%+.3f", settings.offsetSeconds))
-                        .font(.system(size: 32, weight: .bold, design: .rounded))
+                        .font(.system(size: 26, weight: .bold, design: .rounded))
                         .foregroundStyle(
                             LinearGradient(
                                 colors: [.primary, .primary.opacity(0.7)],
@@ -76,12 +76,12 @@ struct ExportSettingsView: View {
                             )
                         )
                     Text("秒")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.secondary)
-                        .padding(.top, 8)
+                        .padding(.top, 4)
                     Spacer()
                 }
-                .padding(.vertical, 16)
+                .padding(.vertical, 10)
                 .background(
                     RoundedRectangle(cornerRadius: 12)
                         .fill(
@@ -144,7 +144,7 @@ struct ExportSettingsView: View {
                 .padding(.horizontal, 4)
             }
         }
-        .padding(20)
+        .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 16)
                 .fill(Color(NSColor.controlBackgroundColor))
