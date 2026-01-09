@@ -10,26 +10,26 @@ struct ContentView: View {
     @State private var pendingFileAction: (() -> Void)?
 
     /// 左カラムの幅
-    private let leftColumnWidth: CGFloat = 320
+    private let leftColumnWidth: CGFloat = 300
 
     var body: some View {
         VStack(spacing: 0) {
             // ヘッダー
             headerView
                 .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+                .padding(.vertical, 10)
 
             Divider()
 
             // メインコンテンツ（2カラム）
             HStack(spacing: 0) {
-                // 左カラム: コントロールパネル
+                // 左カラム: ファイル選択 + エクスポート
                 leftColumn
                     .frame(width: leftColumnWidth)
 
                 Divider()
 
-                // 右カラム: 波形表示
+                // 右カラム: 波形表示 + オフセット調整
                 rightColumn
                     .frame(maxWidth: .infinity)
             }
@@ -41,7 +41,7 @@ struct ContentView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
         }
-        .frame(minWidth: 900, minHeight: 500)
+        .frame(minWidth: 950, minHeight: 520)
         .background(Color(NSColor.windowBackgroundColor))
         // 自動波形表示: 両方のファイルがセットされたら自動的に波形を生成
         .onChange(of: viewModel.project.isReady) { isReady in
@@ -90,10 +90,10 @@ struct ContentView: View {
                             endPoint: .bottomTrailing
                         )
                     )
-                    .frame(width: 36, height: 36)
+                    .frame(width: 34, height: 34)
 
                 Image(systemName: "film.stack")
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(
                         LinearGradient(
                             colors: [Color.accentColor, Color.accentColor.opacity(0.7)],
@@ -104,7 +104,7 @@ struct ContentView: View {
             }
 
             Text("MP4 Sound Replacer")
-                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .font(.system(size: 17, weight: .bold, design: .rounded))
 
             Spacer()
 
@@ -134,58 +134,141 @@ struct ContentView: View {
     // MARK: - Left Column
 
     private var leftColumn: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                // ファイルドロップゾーン
-                VStack(spacing: 10) {
-                    Text("ファイル")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    VideoDropZone(file: viewModel.project.videoFile) { url in
-                        if url.path.isEmpty {
-                            viewModel.clearVideoFile()
-                            syncViewModel.reset()
-                        } else {
-                            setVideoFile(url: url)
-                        }
-                    }
-
-                    AudioDropZone(file: viewModel.project.audioFile) { url in
-                        if url.path.isEmpty {
-                            viewModel.clearAudioFile()
-                            syncViewModel.reset()
-                        } else {
-                            setAudioFile(url: url)
-                        }
+        VStack(spacing: 0) {
+            // ファイルドロップゾーン
+            VStack(spacing: 10) {
+                VideoDropZone(file: viewModel.project.videoFile) { url in
+                    if url.path.isEmpty {
+                        viewModel.clearVideoFile()
+                        syncViewModel.reset()
+                    } else {
+                        setVideoFile(url: url)
                     }
                 }
 
-                Divider()
-
-                // エクスポート設定
-                VStack(spacing: 10) {
-                    Text("エクスポート設定")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    ExportSettingsView(settings: $viewModel.project.exportSettings)
-                        .disabled(!viewModel.project.isReady)
-                        .opacity(viewModel.project.isReady ? 1.0 : 0.6)
+                AudioDropZone(file: viewModel.project.audioFile) { url in
+                    if url.path.isEmpty {
+                        viewModel.clearAudioFile()
+                        syncViewModel.reset()
+                    } else {
+                        setAudioFile(url: url)
+                    }
                 }
-
-                Divider()
-
-                // アクションボタン
-                actionButtonsView
-
-                Spacer()
             }
-            .padding(16)
+            .padding(14)
+
+            Divider()
+                .padding(.horizontal, 14)
+
+            // エクスポート設定
+            exportSettingsSection
+                .padding(14)
+
+            Spacer()
+
+            // アクションボタン（下揃え）
+            actionButtonsSection
+                .padding(14)
         }
         .background(Color(NSColor.controlBackgroundColor).opacity(0.3))
+    }
+
+    // MARK: - Export Settings Section
+
+    private var exportSettingsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // コーデック選択
+            HStack {
+                Text("出力コーデック")
+                    .font(.system(size: 13))
+                    .foregroundColor(.primary)
+
+                Spacer()
+
+                Picker("", selection: $viewModel.project.exportSettings.audioCodec) {
+                    ForEach(AudioCodec.allCases) { codec in
+                        Text(codec.displayName).tag(codec)
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(width: 160)
+            }
+
+            // 自動フェード
+            HStack {
+                Text("自動フェード")
+                    .font(.system(size: 13))
+
+                Spacer()
+
+                Toggle("", isOn: $viewModel.project.exportSettings.autoFadeEnabled)
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .labelsHidden()
+            }
+        }
+    }
+
+    // MARK: - Action Buttons Section
+
+    private var actionButtonsSection: some View {
+        HStack(spacing: 8) {
+            // リセットボタン
+            Button(action: {
+                withAnimation {
+                    viewModel.reset()
+                    syncViewModel.reset()
+                }
+            }) {
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.system(size: 12, weight: .medium))
+                    Text("リセット")
+                        .font(.system(size: 13, weight: .medium))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color(NSColor.controlBackgroundColor))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+                        )
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(viewModel.project.state.isProcessing)
+
+            // エクスポートボタン
+            Button(action: {
+                withAnimation {
+                    viewModel.export()
+                }
+            }) {
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.down.doc.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text("エクスポート")
+                        .font(.system(size: 13, weight: .semibold))
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(
+                    LinearGradient(
+                        colors: [Color.accentColor, Color.accentColor.opacity(0.85)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+            .buttonStyle(.plain)
+            .keyboardShortcut(.defaultAction)
+            .disabled(!viewModel.project.canExport || !viewModel.isFFmpegAvailable)
+            .opacity((!viewModel.project.canExport || !viewModel.isFFmpegAvailable) ? 0.5 : 1.0)
+        }
     }
 
     // MARK: - Right Column
@@ -206,12 +289,26 @@ struct ContentView: View {
                         viewModel.project.exportSettings.offsetSeconds = 0
                     }
                 )
-                .padding(16)
+                .padding(.horizontal, 14)
+                .padding(.top, 14)
+                .padding(.bottom, 10)
+
+                // オフセットコントロール（波形の直下）
+                OffsetControlView(
+                    offsetSeconds: $viewModel.project.exportSettings.offsetSeconds,
+                    onReset: {
+                        viewModel.project.exportSettings.offsetSeconds = 0
+                    }
+                )
+                .padding(.horizontal, 14)
+                .padding(.bottom, 14)
+
+                Spacer()
             } else {
                 // プレースホルダー
-                VStack(spacing: 16) {
+                VStack(spacing: 14) {
                     Image(systemName: "waveform.circle")
-                        .font(.system(size: 60))
+                        .font(.system(size: 56))
                         .foregroundColor(.secondary.opacity(0.3))
 
                     Text("ファイルを選択すると\n波形が表示されます")
@@ -222,62 +319,7 @@ struct ContentView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-    }
-
-    // MARK: - Action Buttons
-
-    private var actionButtonsView: some View {
-        VStack(spacing: 10) {
-            // エクスポートボタン
-            Button(action: {
-                withAnimation {
-                    viewModel.export()
-                }
-            }) {
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.down.doc.fill")
-                        .font(.system(size: 14, weight: .semibold))
-                    Text("エクスポート")
-                        .font(.system(size: 14, weight: .bold))
-                }
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(
-                    LinearGradient(
-                        colors: [Color.accentColor, Color.accentColor.opacity(0.85)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-            }
-            .buttonStyle(.plain)
-            .keyboardShortcut(.defaultAction)
-            .disabled(!viewModel.project.canExport || !viewModel.isFFmpegAvailable)
-            .opacity((!viewModel.project.canExport || !viewModel.isFFmpegAvailable) ? 0.5 : 1.0)
-
-            // リセットボタン
-            Button(action: {
-                withAnimation {
-                    viewModel.reset()
-                    syncViewModel.reset()
-                }
-            }) {
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.counterclockwise")
-                        .font(.system(size: 12, weight: .medium))
-                    Text("リセット")
-                        .font(.system(size: 12, weight: .medium))
-                }
-                .foregroundColor(.secondary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-            }
-            .buttonStyle(.plain)
-            .disabled(viewModel.project.state.isProcessing)
-            .opacity(viewModel.project.state.isProcessing ? 0.5 : 1.0)
-        }
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 
     // MARK: - Status Bar
@@ -290,7 +332,7 @@ struct ContentView: View {
                     .progressViewStyle(.linear)
                     .frame(maxWidth: 200)
                 Text("\(Int(progress * 100))%")
-                    .font(.system(size: 11))
+                    .font(.system(size: 12))
                     .foregroundColor(.secondary)
                     .monospacedDigit()
 
@@ -299,7 +341,7 @@ struct ContentView: View {
                     .foregroundColor(.red)
                     .font(.system(size: 12))
                 Text(message)
-                    .font(.system(size: 11))
+                    .font(.system(size: 12))
                     .foregroundColor(.red)
                     .lineLimit(1)
 
@@ -308,13 +350,13 @@ struct ContentView: View {
                     .foregroundColor(.green)
                     .font(.system(size: 12))
                 Text("完了: \(url.lastPathComponent)")
-                    .font(.system(size: 11))
+                    .font(.system(size: 12))
                     .lineLimit(1)
                 Button("Finderで表示") {
                     NSWorkspace.shared.activateFileViewerSelecting([url])
                 }
                 .buttonStyle(.link)
-                .font(.system(size: 11))
+                .font(.system(size: 12))
 
             default:
                 if viewModel.project.isReady {
@@ -322,14 +364,14 @@ struct ContentView: View {
                         .foregroundColor(.green)
                         .font(.system(size: 12))
                     Text("エクスポート準備完了")
-                        .font(.system(size: 11))
+                        .font(.system(size: 12))
                         .foregroundColor(.secondary)
                 } else {
                     Image(systemName: "info.circle")
                         .foregroundColor(.secondary)
                         .font(.system(size: 12))
                     Text("動画と音声ファイルを選択してください")
-                        .font(.system(size: 11))
+                        .font(.system(size: 12))
                         .foregroundColor(.secondary)
                 }
             }
