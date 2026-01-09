@@ -11,7 +11,6 @@ struct FileDropZone: View {
 
     @State private var isTargeted = false
     @State private var isHovered = false
-    @State private var showDeleteConfirmation = false
 
     var body: some View {
         VStack(spacing: 8) {
@@ -187,7 +186,10 @@ struct FileDropZone: View {
 
             // 削除ボタン
             Button(action: {
-                showDeleteConfirmation = true
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    // file:// スキームのみのURLを使用（pathが空文字になる）
+                    onDrop(URL(string: "file://")!)
+                }
             }) {
                 ZStack {
                     Circle()
@@ -200,17 +202,6 @@ struct FileDropZone: View {
                 }
             }
             .buttonStyle(.plain)
-        }
-        .alert("ファイルを削除しますか？", isPresented: $showDeleteConfirmation) {
-            Button("キャンセル", role: .cancel) { }
-            Button("削除", role: .destructive) {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                    // file:// スキームのみのURLを使用（pathが空文字になる）
-                    onDrop(URL(string: "file://")!)
-                }
-            }
-        } message: {
-            Text("\(file.fileName) を削除します。")
         }
     }
 
