@@ -24,7 +24,7 @@ struct FileDropZone: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 120)
+        .frame(minHeight: 120)
         .padding(12)
         .background(
             ZStack {
@@ -178,7 +178,8 @@ struct FileDropZone: View {
                     Text(file.summary)
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
-                        .lineLimit(1)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
@@ -204,7 +205,8 @@ struct FileDropZone: View {
             Button("キャンセル", role: .cancel) { }
             Button("削除", role: .destructive) {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                    onDrop(URL(fileURLWithPath: ""))
+                    // file:// スキームのみのURLを使用（pathが空文字になる）
+                    onDrop(URL(string: "file://")!)
                 }
             }
         } message: {
