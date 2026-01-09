@@ -178,14 +178,29 @@ class FFmpegDownloadService: NSObject, ObservableObject {
     /// バイナリにad-hoc署名
     private func signBinaries() async throws {
         for path in [ffmpegPath, ffprobePath] {
-            // quarantine属性を削除
-            try await runProcess("/usr/bin/xattr", arguments: ["-cr", path.path])
+            // quarantine属性をSwift APIで削除
+            removeQuarantineAttribute(from: path)
 
-            // 実行権限を設定
-            try await runProcess("/bin/chmod", arguments: ["+x", path.path])
+            // 実行権限をSwift APIで設定
+            try FileManager.default.setAttributes(
+                [.posixPermissions: 0o755],
+                ofItemAtPath: path.path
+            )
 
             // ad-hoc署名
-            try await runProcess("/usr/bin/codesign", arguments: ["-s", "-", path.path])
+            try await runProcess("/usr/bin/codesign", arguments: ["-s", "-", "-f", path.path])
+        }
+    }
+
+    /// quarantine属性を削除
+    private func removeQuarantineAttribute(from url: URL) {
+        let attributes = ["com.apple.quarantine", "com.apple.provenance"]
+        for attr in attributes {
+            _ = url.withUnsafeFileSystemRepresentation { fileSystemPath in
+                if let path = fileSystemPath {
+                    removexattr(path, attr, 0)
+                }
+            }
         }
     }
 

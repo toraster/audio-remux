@@ -29,9 +29,12 @@ class FFmpegService {
 
     /// FFmpegバイナリのパス
     var ffmpegPath: String? {
+        let fm = FileManager.default
+
         // 1. ダウンロード済みFFmpeg（Application Support内）
+        // isExecutableFileはquarantine属性があるとfalseを返すため、fileExistsを使用
         let downloadedPath = FFmpegDownloadService.shared.ffmpegPath
-        if FileManager.default.isExecutableFile(atPath: downloadedPath.path) {
+        if fm.fileExists(atPath: downloadedPath.path) {
             return downloadedPath.path
         }
 
@@ -45,14 +48,14 @@ class FFmpegService {
             .deletingLastPathComponent()  // Services/
             .deletingLastPathComponent()  // MP4SoundReplacer/
             .appendingPathComponent("Resources/ffmpeg")
-        if FileManager.default.isExecutableFile(atPath: sourceDir.path) {
+        if fm.fileExists(atPath: sourceDir.path) {
             return sourceDir.path
         }
 
         // 4. Homebrew版FFmpeg
         let homebrewPaths = ["/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg"]
         for path in homebrewPaths {
-            if FileManager.default.isExecutableFile(atPath: path) {
+            if fm.fileExists(atPath: path) {
                 return path
             }
         }
@@ -63,7 +66,7 @@ class FFmpegService {
     /// FFmpegが利用可能かどうか
     var isAvailable: Bool {
         guard let path = ffmpegPath else { return false }
-        return FileManager.default.isExecutableFile(atPath: path)
+        return FileManager.default.fileExists(atPath: path)
     }
 
     /// 音声差し替えコマンドの引数を生成
