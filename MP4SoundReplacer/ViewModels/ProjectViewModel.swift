@@ -9,6 +9,11 @@ class ProjectViewModel: ObservableObject {
     private let ffmpegService = FFmpegService.shared
     private let ffprobeService = FFprobeService.shared
 
+    /// 動画ファイル読み込みタスク
+    private var videoLoadingTask: Task<Void, Never>?
+    /// 音声ファイル読み込みタスク
+    private var audioLoadingTask: Task<Void, Never>?
+
     /// FFmpegが利用可能か
     var isFFmpegAvailable: Bool {
         ffmpegService.isAvailable
@@ -16,14 +21,21 @@ class ProjectViewModel: ObservableObject {
 
     /// 動画ファイルを設定
     func setVideoFile(url: URL) {
+        // 前のタスクをキャンセル
+        videoLoadingTask?.cancel()
+
         project.state = .loading
 
-        Task {
+        videoLoadingTask = Task {
             do {
                 let mediaFile = try await ffprobeService.getMediaInfo(url: url)
+                // タスクがキャンセルされていないかチェック
+                guard !Task.isCancelled else { return }
                 project.videoFile = mediaFile
                 updateState()
             } catch {
+                // タスクがキャンセルされていないかチェック
+                guard !Task.isCancelled else { return }
                 project.state = .error(message: error.localizedDescription)
             }
         }
@@ -31,14 +43,21 @@ class ProjectViewModel: ObservableObject {
 
     /// 音声ファイルを設定
     func setAudioFile(url: URL) {
+        // 前のタスクをキャンセル
+        audioLoadingTask?.cancel()
+
         project.state = .loading
 
-        Task {
+        audioLoadingTask = Task {
             do {
                 let mediaFile = try await ffprobeService.getMediaInfo(url: url)
+                // タスクがキャンセルされていないかチェック
+                guard !Task.isCancelled else { return }
                 project.audioFile = mediaFile
                 updateState()
             } catch {
+                // タスクがキャンセルされていないかチェック
+                guard !Task.isCancelled else { return }
                 project.state = .error(message: error.localizedDescription)
             }
         }
@@ -46,12 +65,20 @@ class ProjectViewModel: ObservableObject {
 
     /// 動画ファイルをクリア
     func clearVideoFile() {
+        // 進行中のタスクをキャンセル
+        videoLoadingTask?.cancel()
+        videoLoadingTask = nil
+
         project.videoFile = nil
         updateState()
     }
 
     /// 音声ファイルをクリア
     func clearAudioFile() {
+        // 進行中のタスクをキャンセル
+        audioLoadingTask?.cancel()
+        audioLoadingTask = nil
+
         project.audioFile = nil
         updateState()
     }

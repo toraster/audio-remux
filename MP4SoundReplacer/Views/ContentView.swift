@@ -79,6 +79,17 @@ struct ContentView: View {
                 autoGenerateWaveforms()
             }
         }
+        // ファイル差し替え時も波形を再生成
+        .onChange(of: viewModel.project.videoFile?.id) { _ in
+            if viewModel.project.isReady {
+                autoGenerateWaveforms()
+            }
+        }
+        .onChange(of: viewModel.project.audioFile?.id) { _ in
+            if viewModel.project.isReady {
+                autoGenerateWaveforms()
+            }
+        }
         // ファイル差し替え確認ダイアログ
         .alert("ファイルを差し替えますか？", isPresented: $showReplaceConfirmation) {
             Button("キャンセル", role: .cancel) {

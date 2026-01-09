@@ -22,6 +22,7 @@ struct MediaFile: Identifiable {
     var height: Int?
     var frameRate: Double?
     var bitRate: Int?
+    var fileSize: Int64?
 
     var fileName: String {
         url.lastPathComponent
@@ -50,12 +51,45 @@ struct MediaFile: Identifiable {
         return String(format: "%02d:%02d.%03d", minutes, seconds, milliseconds)
     }
 
+    /// フォーマット済みファイルサイズ表示
+    var formattedFileSize: String? {
+        guard let size = fileSize else { return nil }
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: size)
+    }
+
+    /// フォーマット済みチャンネル数表示
+    var formattedChannels: String? {
+        guard let channels = channels else { return nil }
+        switch channels {
+        case 1: return "Mono"
+        case 2: return "Stereo"
+        default: return "\(channels)ch"
+        }
+    }
+
+    /// フォーマット済みビットレート表示
+    var formattedBitRate: String? {
+        guard let bitRate = bitRate else { return nil }
+        let kbps = bitRate / 1000
+        if kbps >= 1000 {
+            let mbps = Double(kbps) / 1000.0
+            return String(format: "%.1fMbps", mbps)
+        }
+        return "\(kbps)kbps"
+    }
+
     /// ファイル情報のサマリー
     var summary: String {
         var parts: [String] = []
 
         if let duration = formattedDuration {
             parts.append(duration)
+        }
+
+        if let fileSize = formattedFileSize {
+            parts.append(fileSize)
         }
 
         if let width = width, let height = height {
@@ -72,6 +106,14 @@ struct MediaFile: Identifiable {
 
         if let sampleRate = sampleRate {
             parts.append("\(sampleRate)Hz")
+        }
+
+        if let channels = formattedChannels {
+            parts.append(channels)
+        }
+
+        if let bitRate = formattedBitRate {
+            parts.append(bitRate)
         }
 
         return parts.joined(separator: " | ")

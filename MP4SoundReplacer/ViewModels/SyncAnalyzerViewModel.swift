@@ -13,11 +13,29 @@ class SyncAnalyzerViewModel: ObservableObject {
     private let waveformGenerator = WaveformGenerator.shared
     private let audioAnalyzer = AudioAnalyzer.shared
 
+    /// 現在実行中のタスク
+    private var currentTask: Task<Void, Never>?
+
     /// 波形データを生成
     /// - Parameters:
     ///   - videoURL: 動画ファイルのURL
     ///   - audioURL: 音声ファイルのURL
     func generateWaveforms(videoURL: URL, audioURL: URL) async {
+        // 前のタスクをキャンセル
+        currentTask?.cancel()
+
+        // ファイル存在チェック
+        guard FileManager.default.fileExists(atPath: videoURL.path) else {
+            print("[SyncAnalyzer] Error: Video file does not exist")
+            syncState = .error("動画ファイルが見つかりません")
+            return
+        }
+        guard FileManager.default.fileExists(atPath: audioURL.path) else {
+            print("[SyncAnalyzer] Error: Audio file does not exist")
+            syncState = .error("音声ファイルが見つかりません")
+            return
+        }
+
         // 処理中の場合は強制リセットしてから開始（スタック防止）
         if syncState.isProcessing {
             print("[SyncAnalyzer] Warning: Previous process was stuck, resetting state")
@@ -110,6 +128,10 @@ class SyncAnalyzerViewModel: ObservableObject {
 
     /// リセット
     func reset() {
+        // 進行中のタスクをキャンセル
+        currentTask?.cancel()
+        currentTask = nil
+
         syncState = .idle
         videoWaveform = nil
         audioWaveform = nil
