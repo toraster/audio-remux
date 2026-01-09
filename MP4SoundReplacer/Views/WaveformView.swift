@@ -136,8 +136,8 @@ struct ZoomableWaveformView: View {
             let maxScroll = max(0, effectiveDuration - visibleDuration)
             scrollPosition = max(0, min(maxScroll, scrollPosition - scrollDelta))
         } else {
-            // ズーム
-            let zoomFactor = 1.0 + Double(delta) * 0.01
+            // ズーム（上スクロールでズームイン、下スクロールでズームアウト）
+            let zoomFactor = 1.0 + Double(delta) * 0.05
             let newZoom = max(1.0, min(100.0, zoomLevel * zoomFactor))
             zoomLevel = newZoom
         }

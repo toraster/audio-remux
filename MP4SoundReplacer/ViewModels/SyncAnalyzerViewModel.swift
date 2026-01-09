@@ -18,32 +18,42 @@ class SyncAnalyzerViewModel: ObservableObject {
     ///   - videoURL: 動画ファイルのURL
     ///   - audioURL: 音声ファイルのURL
     func generateWaveforms(videoURL: URL, audioURL: URL) async {
+        // 処理中の場合は強制リセットしてから開始（スタック防止）
+        if syncState.isProcessing {
+            print("[SyncAnalyzer] Warning: Previous process was stuck, resetting state")
+            syncState = .idle
+        }
+
         syncState = .extractingAudio
+        print("[SyncAnalyzer] Starting audio extraction...")
+        print("[SyncAnalyzer] Video: \(videoURL.path)")
+        print("[SyncAnalyzer] Audio: \(audioURL.path)")
+
+        // 一時ファイルのパス（関数スコープで保持）
+        let tempDir = FileManager.default.temporaryDirectory
+        let videoAudioURL = tempDir.appendingPathComponent("video_audio_\(UUID().uuidString).wav")
+        let audioWavURL = tempDir.appendingPathComponent("audio_\(UUID().uuidString).wav")
+
+        // 最終的に一時ファイルを削除
+        defer {
+            try? FileManager.default.removeItem(at: videoAudioURL)
+            try? FileManager.default.removeItem(at: audioWavURL)
+            print("[SyncAnalyzer] Cleaned up temp files")
+        }
 
         do {
-            // 一時ファイルのパス
-            let tempDir = FileManager.default.temporaryDirectory
-            let videoAudioURL = tempDir.appendingPathComponent("video_audio_\(UUID().uuidString).wav")
-            let audioWavURL = tempDir.appendingPathComponent("audio_\(UUID().uuidString).wav")
-
-            defer {
-                // 一時ファイルの削除
-                try? FileManager.default.removeItem(at: videoAudioURL)
-                try? FileManager.default.removeItem(at: audioWavURL)
-            }
-
             // 動画から音声を抽出
+            print("[SyncAnalyzer] Extracting audio from video...")
             try await ffmpeg.extractAudio(from: videoURL, to: videoAudioURL)
+            print("[SyncAnalyzer] Video audio extraction completed")
 
-            // 音声ファイルをWAVに変換（必要な場合）
-            if audioURL.pathExtension.lowercased() == "wav" {
-                // すでにWAVの場合もモノラル化のため変換
-                try await ffmpeg.convertToWav(from: audioURL, to: audioWavURL)
-            } else {
-                try await ffmpeg.convertToWav(from: audioURL, to: audioWavURL)
-            }
+            // 音声ファイルをWAVに変換
+            print("[SyncAnalyzer] Converting audio to WAV...")
+            try await ffmpeg.convertToWav(from: audioURL, to: audioWavURL)
+            print("[SyncAnalyzer] Audio conversion completed")
 
             syncState = .generatingWaveform
+            print("[SyncAnalyzer] Generating waveforms...")
 
             // 波形データを生成
             async let videoWaveformTask = waveformGenerator.generateWaveform(from: videoAudioURL)
@@ -54,8 +64,13 @@ class SyncAnalyzerViewModel: ObservableObject {
             videoWaveform = videoWf
             audioWaveform = audioWf
             syncState = .idle
+            print("[SyncAnalyzer] Waveform generation completed successfully")
 
+        } catch is CancellationError {
+            print("[SyncAnalyzer] Operation was cancelled")
+            syncState = .error("処理がキャンセルされました")
         } catch {
+            print("[SyncAnalyzer] Error: \(error.localizedDescription)")
             syncState = .error(error.localizedDescription)
         }
     }
