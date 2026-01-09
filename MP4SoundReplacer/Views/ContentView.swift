@@ -69,10 +69,10 @@ struct ContentView: View {
                             .transition(.opacity.combined(with: .scale))
                     }
                 }
-                .padding(16)
+                .padding(12)
             }
         }
-        .frame(minWidth: 660, minHeight: 520)
+        .frame(minWidth: 640, minHeight: 440)
         // 自動波形表示: 両方のファイルがセットされたら自動的に波形を生成
         .onChange(of: viewModel.project.isReady) { isReady in
             if isReady {
@@ -129,7 +129,7 @@ struct ContentView: View {
 
     /// ヘッダー
     private var headerView: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 12) {
             // アイコンにグラデーション
             ZStack {
                 Circle()
@@ -140,10 +140,10 @@ struct ContentView: View {
                             endPoint: .bottomTrailing
                         )
                     )
-                    .frame(width: 60, height: 60)
+                    .frame(width: 44, height: 44)
 
                 Image(systemName: "film.stack")
-                    .font(.system(size: 28, weight: .semibold))
+                    .font(.system(size: 22, weight: .semibold))
                     .foregroundStyle(
                         LinearGradient(
                             colors: [Color.accentColor, Color.accentColor.opacity(0.7)],
@@ -153,32 +153,26 @@ struct ContentView: View {
                     )
             }
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text("MP4 Sound Replacer")
-                    .font(.system(size: 28, weight: .bold, design: .rounded))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.primary, .primary.opacity(0.8)],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
+            Text("MP4 Sound Replacer")
+                .font(.system(size: 22, weight: .bold, design: .rounded))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.primary, .primary.opacity(0.8)],
+                        startPoint: .leading,
+                        endPoint: .trailing
                     )
-
-                Text("動画の音声を無劣化で差し替え")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.secondary)
-            }
+                )
 
             Spacer()
 
             // FFmpeg状態表示
             ffmpegStatusView
         }
-        .padding(16)
+        .padding(12)
         .background(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: 12)
                 .fill(Color(NSColor.controlBackgroundColor))
-                .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
+                .shadow(color: Color.black.opacity(0.05), radius: 6, x: 0, y: 2)
         )
     }
 
@@ -243,27 +237,27 @@ struct ContentView: View {
 
     /// アクションボタン
     private var actionButtonsView: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 12) {
             Button(action: {
                 withAnimation {
                     viewModel.reset()
                     syncViewModel.reset()
                 }
             }) {
-                HStack(spacing: 8) {
+                HStack(spacing: 6) {
                     Image(systemName: "arrow.counterclockwise")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                     Text("リセット")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
                 .background(
-                    RoundedRectangle(cornerRadius: 10)
+                    RoundedRectangle(cornerRadius: 8)
                         .fill(Color(NSColor.controlBackgroundColor))
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 10)
+                    RoundedRectangle(cornerRadius: 8)
                         .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
                 )
             }
@@ -278,15 +272,15 @@ struct ContentView: View {
                     viewModel.export()
                 }
             }) {
-                HStack(spacing: 8) {
+                HStack(spacing: 6) {
                     Image(systemName: "arrow.down.doc.fill")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                     Text("エクスポート")
-                        .font(.system(size: 15, weight: .bold))
+                        .font(.system(size: 14, weight: .bold))
                 }
                 .foregroundColor(.white)
-                .padding(.horizontal, 28)
-                .padding(.vertical, 14)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 10)
                 .background(
                     LinearGradient(
                         colors: [Color.accentColor, Color.accentColor.opacity(0.85)],
@@ -294,8 +288,8 @@ struct ContentView: View {
                         endPoint: .bottomTrailing
                     )
                 )
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .shadow(color: Color.accentColor.opacity(0.3), radius: 8, x: 0, y: 4)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .shadow(color: Color.accentColor.opacity(0.3), radius: 6, x: 0, y: 3)
             }
             .buttonStyle(.plain)
             .keyboardShortcut(.defaultAction)
@@ -308,61 +302,61 @@ struct ContentView: View {
 
     /// エラー表示
     private func errorView(_ message: String) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             ZStack {
                 Circle()
                     .fill(Color.red.opacity(0.15))
-                    .frame(width: 40, height: 40)
+                    .frame(width: 32, height: 32)
 
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(.red)
             }
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text("エラーが発生しました")
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.system(size: 13, weight: .bold))
                     .foregroundColor(.red)
 
                 Text(message)
-                    .font(.system(size: 13))
+                    .font(.system(size: 12))
                     .foregroundColor(.red.opacity(0.9))
             }
 
             Spacer()
         }
-        .padding(16)
+        .padding(12)
         .background(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: 10)
                 .fill(Color.red.opacity(0.08))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: 10)
                         .stroke(Color.red.opacity(0.3), lineWidth: 1)
                 )
         )
-        .shadow(color: Color.red.opacity(0.1), radius: 8, x: 0, y: 2)
+        .shadow(color: Color.red.opacity(0.1), radius: 6, x: 0, y: 2)
     }
 
     /// 完了表示
     private func completedView(_ url: URL) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             ZStack {
                 Circle()
                     .fill(Color.green.opacity(0.15))
-                    .frame(width: 40, height: 40)
+                    .frame(width: 32, height: 32)
 
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.green)
             }
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text("エクスポート完了")
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.system(size: 13, weight: .bold))
                     .foregroundColor(.green)
 
                 Text(url.lastPathComponent)
-                    .font(.system(size: 12))
+                    .font(.system(size: 11))
                     .foregroundColor(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -373,31 +367,31 @@ struct ContentView: View {
             Button(action: {
                 NSWorkspace.shared.activateFileViewerSelecting([url])
             }) {
-                HStack(spacing: 6) {
+                HStack(spacing: 5) {
                     Image(systemName: "folder.fill")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: 11, weight: .semibold))
                     Text("Finderで表示")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold))
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
                 .background(
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: 6)
                         .fill(Color.green.opacity(0.15))
                 )
             }
             .buttonStyle(.plain)
         }
-        .padding(16)
+        .padding(12)
         .background(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: 10)
                 .fill(Color.green.opacity(0.08))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: 10)
                         .stroke(Color.green.opacity(0.3), lineWidth: 1)
                 )
         )
-        .shadow(color: Color.green.opacity(0.1), radius: 8, x: 0, y: 2)
+        .shadow(color: Color.green.opacity(0.1), radius: 6, x: 0, y: 2)
     }
 }
 

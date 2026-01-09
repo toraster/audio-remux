@@ -13,7 +13,7 @@ struct FileDropZone: View {
     @State private var isHovered = false
 
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 8) {
             if let file = file {
                 // ファイルが設定されている場合
                 fileInfoView(file)
@@ -22,8 +22,9 @@ struct FileDropZone: View {
                 dropPromptView
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 100)
-        .padding(16)
+        .frame(maxWidth: .infinity)
+        .frame(height: 120)
+        .padding(12)
         .background(
             ZStack {
                 // ベース背景
@@ -83,7 +84,7 @@ struct FileDropZone: View {
 
     /// ドロップ待ち表示
     private var dropPromptView: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 6) {
             ZStack {
                 Circle()
                     .fill(
@@ -96,10 +97,10 @@ struct FileDropZone: View {
                             endPoint: .bottomTrailing
                         )
                     )
-                    .frame(width: 52, height: 52)
+                    .frame(width: 44, height: 44)
 
                 Image(systemName: icon)
-                    .font(.system(size: 24, weight: .medium))
+                    .font(.system(size: 20, weight: .medium))
                     .foregroundStyle(
                         LinearGradient(
                             colors: [Color.accentColor, Color.accentColor.opacity(0.7)],
@@ -109,26 +110,26 @@ struct FileDropZone: View {
                     )
             }
 
-            VStack(spacing: 2) {
+            VStack(spacing: 1) {
                 Text(title)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
 
                 Text("ドラッグ&ドロップ または")
-                    .font(.system(size: 12))
+                    .font(.system(size: 11))
                     .foregroundColor(.secondary)
             }
 
             Button(action: {
                 selectFile()
             }) {
-                HStack(spacing: 5) {
+                HStack(spacing: 4) {
                     Image(systemName: "doc.badge.plus")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 10, weight: .semibold))
                     Text("ファイルを選択")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: 11, weight: .semibold))
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 6)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 5)
                 .background(
                     Capsule()
                         .fill(Color.accentColor.opacity(0.1))
@@ -144,10 +145,10 @@ struct FileDropZone: View {
 
     /// ファイル情報表示
     private func fileInfoView(_ file: MediaFile) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             // アイコン
             ZStack {
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: 10)
                     .fill(
                         LinearGradient(
                             colors: [
@@ -158,23 +159,23 @@ struct FileDropZone: View {
                             endPoint: .bottomTrailing
                         )
                     )
-                    .frame(width: 50, height: 50)
+                    .frame(width: 44, height: 44)
 
                 Image(systemName: file.isVideo ? "film.fill" : "waveform")
-                    .font(.system(size: 24, weight: .semibold))
+                    .font(.system(size: 20, weight: .semibold))
                     .foregroundColor(.accentColor)
             }
 
             // ファイル情報
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(file.fileName)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .lineLimit(1)
                     .truncationMode(.middle)
 
                 if !file.summary.isEmpty {
                     Text(file.summary)
-                        .font(.system(size: 12))
+                        .font(.system(size: 11))
                         .foregroundColor(.secondary)
                         .lineLimit(1)
                 }
@@ -191,10 +192,10 @@ struct FileDropZone: View {
                 ZStack {
                     Circle()
                         .fill(Color.red.opacity(0.1))
-                        .frame(width: 28, height: 28)
+                        .frame(width: 24, height: 24)
 
                     Image(systemName: "xmark")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(.system(size: 10, weight: .bold))
                         .foregroundColor(.red.opacity(0.8))
                 }
             }
