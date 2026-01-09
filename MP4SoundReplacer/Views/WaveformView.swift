@@ -125,6 +125,7 @@ struct ZoomableWaveformView: View {
             }
 
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .frame(height: 60)
         .clipped()
         .overlay(
