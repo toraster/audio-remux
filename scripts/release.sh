@@ -7,12 +7,12 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 echo "=========================================="
-echo "  MP4 Sound Replacer - Release Build"
+echo "  Audio Remux - Release Build"
 echo "=========================================="
 echo ""
 
 # Step 1: Generate icon (if needed)
-if [ ! -f "${SCRIPT_DIR}/../MP4SoundReplacer/Resources/AppIcon.icns" ]; then
+if [ ! -f "${SCRIPT_DIR}/../AudioRemux/Resources/AppIcon.icns" ]; then
     echo "Step 1: Generating app icon..."
     swift "${SCRIPT_DIR}/generate-icon.swift"
 else
@@ -37,5 +37,5 @@ echo "  Release build complete!"
 echo "=========================================="
 echo ""
 echo "Outputs:"
-echo "  App: build/MP4SoundReplacer.app"
-echo "  DMG: build/MP4SoundReplacer-1.0.0.dmg"
+echo "  App: build/AudioRemux.app"
+echo "  DMG: build/AudioRemux-1.0.0.dmg"

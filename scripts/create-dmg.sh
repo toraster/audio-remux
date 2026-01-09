@@ -2,8 +2,8 @@
 set -e
 
 # Configuration
-APP_NAME="MP4SoundReplacer"
-DISPLAY_NAME="MP4 Sound Replacer"
+APP_NAME="AudioRemux"
+DISPLAY_NAME="Audio Remux"
 VERSION="1.0.0"
 
 # Paths

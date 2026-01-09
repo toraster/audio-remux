@@ -2,15 +2,15 @@
 set -e
 
 # Configuration
-APP_NAME="MP4SoundReplacer"
-DISPLAY_NAME="MP4 Sound Replacer"
-BUNDLE_ID="com.toratora.mp4soundreplacer"
+APP_NAME="AudioRemux"
+DISPLAY_NAME="Audio Remux"
+BUNDLE_ID="com.toratora.audioremux"
 VERSION="1.0.0"
 
 # Paths
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-PACKAGE_DIR="${PROJECT_ROOT}/MP4SoundReplacer"
+PACKAGE_DIR="${PROJECT_ROOT}/AudioRemux"
 BUILD_DIR="${PACKAGE_DIR}/.build/release"
 OUTPUT_DIR="${PROJECT_ROOT}/build"
 APP_BUNDLE="${OUTPUT_DIR}/${APP_NAME}.app"
@@ -47,7 +47,7 @@ echo "Copying Info.plist..."
 cp "${PACKAGE_DIR}/Resources/Info.plist" "${APP_BUNDLE}/Contents/"
 
 # Copy entitlements for reference
-cp "${PACKAGE_DIR}/Entitlements/MP4SoundReplacer.entitlements" "${APP_BUNDLE}/Contents/Resources/"
+cp "${PACKAGE_DIR}/Entitlements/AudioRemux.entitlements" "${APP_BUNDLE}/Contents/Resources/"
 
 # Copy app icon if exists
 if [ -f "${PACKAGE_DIR}/Resources/AppIcon.icns" ]; then
@@ -61,7 +61,7 @@ echo -n "APPL????" > "${APP_BUNDLE}/Contents/PkgInfo"
 # Code sign with entitlements (ad-hoc signing for development)
 echo "Code signing..."
 codesign --force --deep --sign - \
-    --entitlements "${PACKAGE_DIR}/Entitlements/MP4SoundReplacer.entitlements" \
+    --entitlements "${PACKAGE_DIR}/Entitlements/AudioRemux.entitlements" \
     "${APP_BUNDLE}"
 
 # Verify
