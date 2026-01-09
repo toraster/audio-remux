@@ -5,6 +5,7 @@ enum FFprobeError: LocalizedError {
     case binaryNotFound
     case executionFailed(String)
     case parseError
+    case timeout(TimeInterval)
 
     var errorDescription: String? {
         switch self {
@@ -14,6 +15,8 @@ enum FFprobeError: LocalizedError {
             return "FFprobe実行エラー: \(message)"
         case .parseError:
             return "メディア情報の解析に失敗しました"
+        case .timeout(let seconds):
+            return "メディア情報の取得がタイムアウトしました（\(Int(seconds))秒）"
         }
     }
 }
@@ -61,6 +64,9 @@ private struct FFprobeFormat: Decodable {
 /// FFprobe実行サービス
 class FFprobeService {
     static let shared = FFprobeService()
+
+    /// デフォルトタイムアウト（秒）
+    static let defaultTimeout: TimeInterval = 30
 
     private init() {}
 
@@ -128,38 +134,138 @@ class FFprobeService {
         return parseMediaFile(url: url, probeOutput: probeOutput)
     }
 
-    /// FFprobeを実行
-    private func executeFFprobe(path: String, arguments: [String]) async throws -> String {
-        return try await withCheckedThrowingContinuation { continuation in
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: path)
-            process.arguments = arguments
-
-            let outputPipe = Pipe()
-            let errorPipe = Pipe()
-            process.standardOutput = outputPipe
-            process.standardError = errorPipe
-
-            do {
-                try process.run()
-            } catch {
-                continuation.resume(throwing: FFprobeError.executionFailed(error.localizedDescription))
-                return
+    /// FFprobeを実行（タイムアウト付き）
+    private func executeFFprobe(
+        path: String,
+        arguments: [String],
+        timeout: TimeInterval = defaultTimeout
+    ) async throws -> String {
+        return try await withThrowingTaskGroup(of: String.self) { group in
+            // メインの実行タスク
+            group.addTask {
+                try await self.executeProcess(path: path, arguments: arguments)
             }
 
-            process.waitUntilExit()
-
-            let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
-            let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
-
-            let output = String(data: outputData, encoding: .utf8) ?? ""
-            let errorOutput = String(data: errorData, encoding: .utf8) ?? ""
-
-            if process.terminationStatus != 0 {
-                continuation.resume(throwing: FFprobeError.executionFailed(errorOutput))
-            } else {
-                continuation.resume(returning: output)
+            // タイムアウトタスク
+            group.addTask {
+                try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                throw FFprobeError.timeout(timeout)
             }
+
+            // 最初に完了したタスクの結果を返す
+            let result = try await group.next()!
+            group.cancelAll()
+            return result
+        }
+    }
+
+    /// プロセスを実行して結果を返す（内部メソッド）
+    private func executeProcess(path: String, arguments: [String]) async throws -> String {
+        // プロセスを先に作成（キャンセルハンドラからアクセスするため）
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: path)
+        process.arguments = arguments
+
+        let outputPipe = Pipe()
+        let errorPipe = Pipe()
+        process.standardOutput = outputPipe
+        process.standardError = errorPipe
+
+        // ProcessManagerに登録（アプリ終了時に確実に終了させるため）
+        ProcessManager.shared.register(process)
+
+        // タスクキャンセル時にプロセスを終了させる
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                let resumeOnce = OnceFlag()
+
+                // 出力データを蓄積する変数
+                var outputData = Data()
+                var errorData = Data()
+                let dataLock = NSLock()
+
+                // stdout を非同期で読み取り
+                outputPipe.fileHandleForReading.readabilityHandler = { handle in
+                    let data = handle.availableData
+                    if !data.isEmpty {
+                        dataLock.lock()
+                        outputData.append(data)
+                        dataLock.unlock()
+                    }
+                }
+
+                // stderr を非同期で読み取り
+                errorPipe.fileHandleForReading.readabilityHandler = { handle in
+                    let data = handle.availableData
+                    if !data.isEmpty {
+                        dataLock.lock()
+                        errorData.append(data)
+                        dataLock.unlock()
+                    }
+                }
+
+                // プロセス終了時の処理
+                process.terminationHandler = { proc in
+                    // ProcessManagerから登録解除
+                    ProcessManager.shared.unregister(proc)
+
+                    // まずハンドラをクリア（これ以上のコールバックを防ぐ）
+                    outputPipe.fileHandleForReading.readabilityHandler = nil
+                    errorPipe.fileHandleForReading.readabilityHandler = nil
+
+                    // 残りのデータを読み取り（ロック外で実行してデッドロック防止）
+                    let remainingOutput = outputPipe.fileHandleForReading.readDataToEndOfFile()
+                    let remainingError = errorPipe.fileHandleForReading.readDataToEndOfFile()
+
+                    // ロックを取得してデータを結合
+                    dataLock.lock()
+                    outputData.append(remainingOutput)
+                    errorData.append(remainingError)
+                    let finalOutput = String(data: outputData, encoding: .utf8) ?? ""
+                    let finalError = String(data: errorData, encoding: .utf8) ?? ""
+                    dataLock.unlock()
+
+                    // 一度だけresumeを呼ぶ（二重呼び出し防止）
+                    guard resumeOnce.tryRun() else { return }
+
+                    // キャンセルによる終了か確認
+                    if Task.isCancelled {
+                        continuation.resume(throwing: CancellationError())
+                    } else if proc.terminationStatus != 0 {
+                        continuation.resume(throwing: FFprobeError.executionFailed(finalError))
+                    } else {
+                        continuation.resume(returning: finalOutput)
+                    }
+                }
+
+                do {
+                    try process.run()
+                } catch {
+                    // プロセス起動失敗時（terminationHandlerは呼ばれない）
+                    guard resumeOnce.tryRun() else { return }
+                    continuation.resume(throwing: FFprobeError.executionFailed(error.localizedDescription))
+                }
+            }
+        } onCancel: {
+            // タスクがキャンセルされたらプロセスを終了
+            if process.isRunning {
+                process.terminate()
+            }
+        }
+    }
+
+    /// スレッドセーフな1回限りの実行を保証するクラス
+    private final class OnceFlag: @unchecked Sendable {
+        private var _done = false
+        private let lock = NSLock()
+
+        /// 最初の呼び出しのみtrueを返し、以降はfalseを返す
+        func tryRun() -> Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            if _done { return false }
+            _done = true
+            return true
         }
     }
 
