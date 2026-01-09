@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleExecutable</key>
-    <string>MP4SoundReplacer</string>
+    <string>AudioRemux</string>
     <key>CFBundleIdentifier</key>
-    <string>com.toratora.mp4soundreplacer</string>
+    <string>com.toratora.audioremux</string>
     <key>CFBundleName</key>
-    <string>MP4SoundReplacer</string>
+    <string>AudioRemux</string>
     <key>CFBundleDisplayName</key>
-    <string>MP4 Sound Replacer</string>
+    <string>Audio Remux</string>
     <key>CFBundleVersion</key>
     <string>1</string>
     <key>CFBundleShortVersionString</key>

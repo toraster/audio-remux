@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct MP4SoundReplacerApp: App {
+struct AudioRemuxApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @State private var isFFmpegAvailable = false
 
