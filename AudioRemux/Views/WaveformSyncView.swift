@@ -29,13 +29,12 @@ struct WaveformSyncView: View {
 
             // 波形表示エリア
             waveformSection
-                .overlay(
-                    // キーボードナビゲーション（Home/Endキー対応）
+                .background(
+                    // キーボードナビゲーション（Home/Endキー対応、フォーカス不要）
                     KeyboardNavigationView(
                         onHome: { scrollPosition = 0 },
                         onEnd: { scrollPosition = maxScrollPosition }
                     )
-                    .allowsHitTesting(true)
                 )
 
             // 区切り線

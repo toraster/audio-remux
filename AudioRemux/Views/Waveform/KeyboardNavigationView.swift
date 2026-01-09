@@ -1,43 +1,65 @@
 import SwiftUI
 
-/// キーボードナビゲーション用のNSView（Home/Endキー対応）
-struct KeyboardNavigationView: NSViewRepresentable {
+/// キーボードナビゲーション用のビュー（Home/Endキー対応）
+/// フォーカスに関係なくキーイベントを検出
+struct KeyboardNavigationView: View {
     let onHome: () -> Void
     let onEnd: () -> Void
 
-    func makeNSView(context: Context) -> KeyboardNavigationNSView {
-        let view = KeyboardNavigationNSView()
-        view.onHome = onHome
-        view.onEnd = onEnd
-        return view
-    }
-
-    func updateNSView(_ nsView: KeyboardNavigationNSView, context: Context) {
-        nsView.onHome = onHome
-        nsView.onEnd = onEnd
+    var body: some View {
+        Color.clear
+            .frame(width: 0, height: 0)
+            .onAppear {
+                KeyboardMonitor.shared.register(onHome: onHome, onEnd: onEnd)
+            }
+            .onDisappear {
+                KeyboardMonitor.shared.unregister()
+            }
     }
 }
 
-class KeyboardNavigationNSView: NSView {
-    var onHome: (() -> Void)?
-    var onEnd: (() -> Void)?
+/// グローバルキーボードモニター
+class KeyboardMonitor {
+    static let shared = KeyboardMonitor()
 
-    override var acceptsFirstResponder: Bool { true }
+    private var monitor: Any?
+    private var onHome: (() -> Void)?
+    private var onEnd: (() -> Void)?
 
-    override func keyDown(with event: NSEvent) {
-        switch event.keyCode {
-        case 115: // Home key
-            onHome?()
-        case 119: // End key
-            onEnd?()
-        default:
-            super.keyDown(with: event)
+    private init() {}
+
+    func register(onHome: @escaping () -> Void, onEnd: @escaping () -> Void) {
+        self.onHome = onHome
+        self.onEnd = onEnd
+
+        // 既存のモニターがあれば削除
+        if let monitor = monitor {
+            NSEvent.removeMonitor(monitor)
+        }
+
+        // ローカルイベントモニターを追加
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self = self else { return event }
+
+            switch event.keyCode {
+            case 115: // Home key
+                self.onHome?()
+                return nil // イベントを消費
+            case 119: // End key
+                self.onEnd?()
+                return nil // イベントを消費
+            default:
+                return event // 他のイベントはそのまま通す
+            }
         }
     }
 
-    override func mouseDown(with event: NSEvent) {
-        // クリックでフォーカスを取得
-        window?.makeFirstResponder(self)
-        super.mouseDown(with: event)
+    func unregister() {
+        if let monitor = monitor {
+            NSEvent.removeMonitor(monitor)
+            self.monitor = nil
+        }
+        onHome = nil
+        onEnd = nil
     }
 }
