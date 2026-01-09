@@ -72,12 +72,18 @@ class FFprobeService {
 
     /// FFprobeバイナリのパス
     var ffprobePath: String? {
-        // 1. アプリバンドル内を探す（Xcode配布用）
+        // 1. ダウンロード済みFFprobe（Application Support内）
+        let downloadedPath = FFmpegDownloadService.shared.ffprobePath
+        if FileManager.default.isExecutableFile(atPath: downloadedPath.path) {
+            return downloadedPath.path
+        }
+
+        // 2. アプリバンドル内を探す（Xcode配布用）
         if let bundlePath = Bundle.main.path(forResource: "ffprobe", ofType: nil) {
             return bundlePath
         }
 
-        // 2. 開発時: ソースディレクトリのResourcesを探す
+        // 3. 開発時: ソースディレクトリのResourcesを探す
         let sourceDir = URL(fileURLWithPath: #file)
             .deletingLastPathComponent()  // Services/
             .deletingLastPathComponent()  // MP4SoundReplacer/
@@ -86,7 +92,7 @@ class FFprobeService {
             return sourceDir.path
         }
 
-        // 3. Homebrew版FFprobe
+        // 4. Homebrew版FFprobe
         let homebrewPaths = ["/opt/homebrew/bin/ffprobe", "/usr/local/bin/ffprobe"]
         for path in homebrewPaths {
             if FileManager.default.isExecutableFile(atPath: path) {

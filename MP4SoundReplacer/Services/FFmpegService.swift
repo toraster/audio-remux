@@ -29,12 +29,18 @@ class FFmpegService {
 
     /// FFmpegバイナリのパス
     var ffmpegPath: String? {
-        // 1. アプリバンドル内を探す（Xcode配布用）
+        // 1. ダウンロード済みFFmpeg（Application Support内）
+        let downloadedPath = FFmpegDownloadService.shared.ffmpegPath
+        if FileManager.default.isExecutableFile(atPath: downloadedPath.path) {
+            return downloadedPath.path
+        }
+
+        // 2. アプリバンドル内を探す（Xcode配布用）
         if let bundlePath = Bundle.main.path(forResource: "ffmpeg", ofType: nil) {
             return bundlePath
         }
 
-        // 2. 開発時: ソースディレクトリのResourcesを探す
+        // 3. 開発時: ソースディレクトリのResourcesを探す
         let sourceDir = URL(fileURLWithPath: #file)
             .deletingLastPathComponent()  // Services/
             .deletingLastPathComponent()  // MP4SoundReplacer/
@@ -43,7 +49,7 @@ class FFmpegService {
             return sourceDir.path
         }
 
-        // 3. Homebrew版FFmpeg
+        // 4. Homebrew版FFmpeg
         let homebrewPaths = ["/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg"]
         for path in homebrewPaths {
             if FileManager.default.isExecutableFile(atPath: path) {
