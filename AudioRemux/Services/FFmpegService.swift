@@ -46,7 +46,7 @@ class FFmpegService {
         // 3. 開発時: ソースディレクトリのResourcesを探す
         let sourceDir = URL(fileURLWithPath: #file)
             .deletingLastPathComponent()  // Services/
-            .deletingLastPathComponent()  // MP4SoundReplacer/
+            .deletingLastPathComponent()  // AudioRemux/
             .appendingPathComponent("Resources/ffmpeg")
         if fm.fileExists(atPath: sourceDir.path) {
             return sourceDir.path

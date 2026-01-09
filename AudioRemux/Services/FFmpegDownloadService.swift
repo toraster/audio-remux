@@ -47,7 +47,7 @@ class FFmpegDownloadService: NSObject, ObservableObject {
             in: .userDomainMask
         ).first!
         return appSupport
-            .appendingPathComponent("MP4SoundReplacer")
+            .appendingPathComponent("AudioRemux")
             .appendingPathComponent("bin")
     }
 
