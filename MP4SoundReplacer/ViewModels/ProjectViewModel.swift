@@ -13,6 +13,8 @@ class ProjectViewModel: ObservableObject {
     private var videoLoadingTask: Task<Void, Never>?
     /// 音声ファイル読み込みタスク
     private var audioLoadingTask: Task<Void, Never>?
+    /// エクスポートタスク
+    private var exportTask: Task<Void, Never>?
 
     /// FFmpegが利用可能か
     var isFFmpegAvailable: Bool {
@@ -94,6 +96,14 @@ class ProjectViewModel: ObservableObject {
 
     /// プロジェクトをリセット
     func reset() {
+        // 進行中のタスクをすべてキャンセル
+        videoLoadingTask?.cancel()
+        videoLoadingTask = nil
+        audioLoadingTask?.cancel()
+        audioLoadingTask = nil
+        exportTask?.cancel()
+        exportTask = nil
+
         project.reset()
     }
 
@@ -113,12 +123,15 @@ class ProjectViewModel: ObservableObject {
             return
         }
 
+        // 前のエクスポートをキャンセル
+        exportTask?.cancel()
+
         let settings = project.exportSettings
         let outputURL = settings.outputURL(from: videoFile.url)
 
         project.state = .exporting(progress: 0)
 
-        Task {
+        exportTask = Task {
             do {
                 try await ffmpegService.replaceAudio(
                     videoURL: videoFile.url,
@@ -127,11 +140,22 @@ class ProjectViewModel: ObservableObject {
                     settings: settings
                 )
 
+                guard !Task.isCancelled else { return }
                 project.state = .completed(outputURL: outputURL)
+            } catch is CancellationError {
+                project.state = .idle
             } catch {
+                guard !Task.isCancelled else { return }
                 project.state = .error(message: error.localizedDescription)
             }
         }
+    }
+
+    /// エクスポートをキャンセル
+    func cancelExport() {
+        exportTask?.cancel()
+        exportTask = nil
+        project.state = .idle
     }
 
     /// 出力先を選択

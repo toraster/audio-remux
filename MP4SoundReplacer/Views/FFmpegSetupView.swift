@@ -206,7 +206,7 @@ struct FFmpegSetupView: View {
             do {
                 try await downloadService.downloadAndInstall()
             } catch {
-                print("Download failed: \(error)")
+                Logger.error("Download failed: \(error)", category: .download)
             }
         }
     }
