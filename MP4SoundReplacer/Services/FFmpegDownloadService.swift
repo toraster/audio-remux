@@ -108,7 +108,7 @@ class FFmpegDownloadService: NSObject, ObservableObject {
                 try? fm.removeItem(at: binaryPath)
 
                 // ダウンロード
-                print("[FFmpegDownload] Downloading \(binary) from \(url)")
+                Logger.debug("Downloading \(binary) from \(url)", category: .download)
                 let downloadedURL = try await downloadFile(from: url)
 
                 // ダウンロードしたファイルを移動
@@ -116,7 +116,7 @@ class FFmpegDownloadService: NSObject, ObservableObject {
 
                 // 解凍
                 state = .extracting
-                print("[FFmpegDownload] Extracting \(binary)...")
+                Logger.debug("Extracting \(binary)...", category: .download)
                 try await extractZip(zipPath, to: binariesDirectory)
 
                 // ZIPファイル削除
@@ -125,14 +125,14 @@ class FFmpegDownloadService: NSObject, ObservableObject {
 
             // コード署名
             state = .signing
-            print("[FFmpegDownload] Signing binaries...")
+            Logger.debug("Signing binaries...", category: .download)
             try await signBinaries()
 
             state = .completed
-            print("[FFmpegDownload] Installation completed successfully")
+            Logger.info("Installation completed successfully", category: .download)
 
         } catch {
-            print("[FFmpegDownload] Error: \(error)")
+            Logger.error("Error: \(error)", category: .download)
             state = .failed(error.localizedDescription)
             throw error
         }

@@ -20,32 +20,34 @@ class SyncAnalyzerViewModel: ObservableObject {
     /// - Parameters:
     ///   - videoURL: 動画ファイルのURL
     ///   - audioURL: 音声ファイルのURL
-    func generateWaveforms(videoURL: URL, audioURL: URL) async {
+    /// - Returns: 成功した場合true、失敗またはキャンセルの場合false
+    @discardableResult
+    func generateWaveforms(videoURL: URL, audioURL: URL) async -> Bool {
         // 前のタスクをキャンセル
         currentTask?.cancel()
 
         // ファイル存在チェック
         guard FileManager.default.fileExists(atPath: videoURL.path) else {
-            print("[SyncAnalyzer] Error: Video file does not exist")
+            Logger.error("Video file does not exist", category: .syncAnalyzer)
             syncState = .error("動画ファイルが見つかりません")
-            return
+            return false
         }
         guard FileManager.default.fileExists(atPath: audioURL.path) else {
-            print("[SyncAnalyzer] Error: Audio file does not exist")
+            Logger.error("Audio file does not exist", category: .syncAnalyzer)
             syncState = .error("音声ファイルが見つかりません")
-            return
+            return false
         }
 
         // 処理中の場合は強制リセットしてから開始（スタック防止）
         if syncState.isProcessing {
-            print("[SyncAnalyzer] Warning: Previous process was stuck, resetting state")
+            Logger.warning("Previous process was stuck, resetting state", category: .syncAnalyzer)
             syncState = .idle
         }
 
         syncState = .extractingAudio
-        print("[SyncAnalyzer] Starting audio extraction...")
-        print("[SyncAnalyzer] Video: \(videoURL.path)")
-        print("[SyncAnalyzer] Audio: \(audioURL.path)")
+        Logger.debug("Starting audio extraction...", category: .syncAnalyzer)
+        Logger.debug("Video: \(videoURL.path)", category: .syncAnalyzer)
+        Logger.debug("Audio: \(audioURL.path)", category: .syncAnalyzer)
 
         // 一時ファイルのパス（関数スコープで保持）
         let tempDir = FileManager.default.temporaryDirectory
@@ -56,22 +58,22 @@ class SyncAnalyzerViewModel: ObservableObject {
         defer {
             try? FileManager.default.removeItem(at: videoAudioURL)
             try? FileManager.default.removeItem(at: audioWavURL)
-            print("[SyncAnalyzer] Cleaned up temp files")
+            Logger.debug("Cleaned up temp files", category: .syncAnalyzer)
         }
 
         do {
             // 動画から音声を抽出
-            print("[SyncAnalyzer] Extracting audio from video...")
+            Logger.debug("Extracting audio from video...", category: .syncAnalyzer)
             try await ffmpeg.extractAudio(from: videoURL, to: videoAudioURL)
-            print("[SyncAnalyzer] Video audio extraction completed")
+            Logger.debug("Video audio extraction completed", category: .syncAnalyzer)
 
             // 音声ファイルをWAVに変換
-            print("[SyncAnalyzer] Converting audio to WAV...")
+            Logger.debug("Converting audio to WAV...", category: .syncAnalyzer)
             try await ffmpeg.convertToWav(from: audioURL, to: audioWavURL)
-            print("[SyncAnalyzer] Audio conversion completed")
+            Logger.debug("Audio conversion completed", category: .syncAnalyzer)
 
             syncState = .generatingWaveform
-            print("[SyncAnalyzer] Generating waveforms...")
+            Logger.debug("Generating waveforms...", category: .syncAnalyzer)
 
             // 波形データを生成
             async let videoWaveformTask = waveformGenerator.generateWaveform(from: videoAudioURL)
@@ -82,22 +84,27 @@ class SyncAnalyzerViewModel: ObservableObject {
             videoWaveform = videoWf
             audioWaveform = audioWf
             syncState = .idle
-            print("[SyncAnalyzer] Waveform generation completed successfully")
+            Logger.info("Waveform generation completed successfully", category: .syncAnalyzer)
+            return true
 
         } catch is CancellationError {
-            print("[SyncAnalyzer] Operation was cancelled")
+            Logger.debug("Operation was cancelled", category: .syncAnalyzer)
             syncState = .error("処理がキャンセルされました")
+            return false
         } catch {
-            print("[SyncAnalyzer] Error: \(error.localizedDescription)")
+            Logger.error("Error: \(error.localizedDescription)", category: .syncAnalyzer)
             syncState = .error(error.localizedDescription)
+            return false
         }
     }
 
     /// 自動同期分析を実行
-    func analyzeSync() async {
+    /// - Returns: 成功した場合SyncAnalysisResult、失敗の場合nil
+    @discardableResult
+    func analyzeSync() async -> SyncAnalysisResult? {
         guard let videoWf = videoWaveform, let audioWf = audioWaveform else {
             syncState = .error("波形データが生成されていません")
-            return
+            return nil
         }
 
         syncState = .analyzing
@@ -110,9 +117,11 @@ class SyncAnalyzerViewModel: ObservableObject {
 
             lastResult = result
             syncState = .completed(result)
+            return result
 
         } catch {
             syncState = .error(error.localizedDescription)
+            return nil
         }
     }
 
