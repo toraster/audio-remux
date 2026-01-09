@@ -29,6 +29,14 @@ struct WaveformSyncView: View {
 
             // 波形表示エリア
             waveformSection
+                .overlay(
+                    // キーボードナビゲーション（Home/Endキー対応）
+                    KeyboardNavigationView(
+                        onHome: { scrollPosition = 0 },
+                        onEnd: { scrollPosition = maxScrollPosition }
+                    )
+                    .allowsHitTesting(true)
+                )
 
             // 区切り線
             Rectangle()
@@ -350,7 +358,7 @@ struct WaveformSyncView: View {
                     Image(systemName: "lightbulb.fill")
                         .font(.system(size: 10))
                         .foregroundColor(.yellow)
-                    Text("ホイールでズーム、Shift+ホイールでスクロール、緑の波形をドラッグで調整")
+                    Text("ホイールでズーム、Shift+ホイールでスクロール、Home/Endで先頭/末尾、緑の波形をドラッグで調整")
                         .font(.system(size: 10))
                         .foregroundColor(.secondary)
                 }
