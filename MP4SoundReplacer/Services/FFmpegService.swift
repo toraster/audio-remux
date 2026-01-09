@@ -286,6 +286,14 @@ class FFmpegService {
         settings: ExportSettings,
         progressHandler: ((Double) -> Void)? = nil
     ) async throws {
+        // ファイル存在チェック
+        guard FileManager.default.fileExists(atPath: videoURL.path) else {
+            throw FFmpegError.executionFailed("動画ファイルが見つかりません: \(videoURL.lastPathComponent)")
+        }
+        guard FileManager.default.fileExists(atPath: audioURL.path) else {
+            throw FFmpegError.executionFailed("音声ファイルが見つかりません: \(audioURL.lastPathComponent)")
+        }
+
         // 動画の長さを取得（フェード適用および負のオフセット時の出力長制御に使用）
         var videoDuration: Double?
         if settings.offsetSeconds < 0 {
@@ -324,6 +332,11 @@ class FFmpegService {
         to outputURL: URL,
         sampleRate: Int = 48000
     ) async throws {
+        // ファイル存在チェック
+        guard FileManager.default.fileExists(atPath: videoURL.path) else {
+            throw FFmpegError.executionFailed("入力ファイルが見つかりません: \(videoURL.lastPathComponent)")
+        }
+
         let arguments = [
             "-y",
             "-nostdin",  // 標準入力を無効化（ハング防止）
@@ -349,6 +362,11 @@ class FFmpegService {
         to outputURL: URL,
         sampleRate: Int = 48000
     ) async throws {
+        // ファイル存在チェック
+        guard FileManager.default.fileExists(atPath: audioURL.path) else {
+            throw FFmpegError.executionFailed("入力ファイルが見つかりません: \(audioURL.lastPathComponent)")
+        }
+
         let arguments = [
             "-y",
             "-nostdin",  // 標準入力を無効化（ハング防止）
