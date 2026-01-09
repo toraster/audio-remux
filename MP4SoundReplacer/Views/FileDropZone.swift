@@ -13,7 +13,7 @@ struct FileDropZone: View {
     @State private var isHovered = false
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 6) {
             if let file = file {
                 // ファイルが設定されている場合
                 fileInfoView(file)
@@ -23,17 +23,17 @@ struct FileDropZone: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .frame(minHeight: 120)
-        .padding(12)
+        .frame(minHeight: file == nil ? 70 : 60)
+        .padding(10)
         .background(
             ZStack {
                 // ベース背景
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: 12)
                     .fill(Color(NSColor.controlBackgroundColor))
 
                 // グラデーションオーバーレイ（ターゲット時）
                 if isTargeted {
-                    RoundedRectangle(cornerRadius: 16)
+                    RoundedRectangle(cornerRadius: 12)
                         .fill(
                             LinearGradient(
                                 colors: [
@@ -48,7 +48,7 @@ struct FileDropZone: View {
             }
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: 12)
                 .strokeBorder(
                     isTargeted ?
                         LinearGradient(
@@ -62,18 +62,17 @@ struct FileDropZone: View {
                             endPoint: .bottomTrailing
                         ),
                     style: StrokeStyle(
-                        lineWidth: isTargeted ? 2.5 : 1.5,
-                        dash: file == nil ? [12, 6] : []
+                        lineWidth: isTargeted ? 2 : 1,
+                        dash: file == nil ? [8, 4] : []
                     )
                 )
         )
-        .shadow(color: isTargeted ? Color.accentColor.opacity(0.2) : Color.black.opacity(0.05),
-                radius: isTargeted ? 12 : 6,
+        .shadow(color: isTargeted ? Color.accentColor.opacity(0.2) : Color.black.opacity(0.03),
+                radius: isTargeted ? 8 : 4,
                 x: 0,
-                y: isTargeted ? 4 : 2)
-        .scaleEffect(isTargeted ? 1.02 : (isHovered ? 1.01 : 1.0))
+                y: isTargeted ? 3 : 1)
+        .scaleEffect(isTargeted ? 1.01 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isTargeted)
-        .animation(.easeInOut(duration: 0.2), value: isHovered)
         .onHover { hovering in
             isHovered = hovering
         }
@@ -84,7 +83,7 @@ struct FileDropZone: View {
 
     /// ドロップ待ち表示
     private var dropPromptView: some View {
-        VStack(spacing: 6) {
+        HStack(spacing: 12) {
             ZStack {
                 Circle()
                     .fill(
@@ -97,10 +96,10 @@ struct FileDropZone: View {
                             endPoint: .bottomTrailing
                         )
                     )
-                    .frame(width: 44, height: 44)
+                    .frame(width: 40, height: 40)
 
                 Image(systemName: icon)
-                    .font(.system(size: 20, weight: .medium))
+                    .font(.system(size: 18, weight: .medium))
                     .foregroundStyle(
                         LinearGradient(
                             colors: [Color.accentColor, Color.accentColor.opacity(0.7)],
@@ -110,34 +109,32 @@ struct FileDropZone: View {
                     )
             }
 
-            VStack(spacing: 1) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.system(size: 13, weight: .semibold))
 
-                Text("ドラッグ&ドロップ または")
+                Text("ドラッグ&ドロップ")
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
             }
 
+            Spacer()
+
             Button(action: {
                 selectFile()
             }) {
-                HStack(spacing: 4) {
-                    Image(systemName: "doc.badge.plus")
-                        .font(.system(size: 10, weight: .semibold))
-                    Text("ファイルを選択")
-                        .font(.system(size: 11, weight: .semibold))
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 5)
-                .background(
-                    Capsule()
-                        .fill(Color.accentColor.opacity(0.1))
-                )
-                .overlay(
-                    Capsule()
-                        .stroke(Color.accentColor.opacity(0.3), lineWidth: 1)
-                )
+                Text("選択")
+                    .font(.system(size: 12, weight: .medium))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 5)
+                    .background(
+                        Capsule()
+                            .fill(Color.accentColor.opacity(0.1))
+                    )
+                    .overlay(
+                        Capsule()
+                            .stroke(Color.accentColor.opacity(0.3), lineWidth: 1)
+                    )
             }
             .buttonStyle(.plain)
         }
@@ -148,7 +145,7 @@ struct FileDropZone: View {
         HStack(spacing: 10) {
             // アイコン
             ZStack {
-                RoundedRectangle(cornerRadius: 10)
+                RoundedRectangle(cornerRadius: 8)
                     .fill(
                         LinearGradient(
                             colors: [
@@ -159,10 +156,10 @@ struct FileDropZone: View {
                             endPoint: .bottomTrailing
                         )
                     )
-                    .frame(width: 44, height: 44)
+                    .frame(width: 40, height: 40)
 
                 Image(systemName: file.isVideo ? "film.fill" : "waveform")
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.system(size: 18, weight: .semibold))
                     .foregroundColor(.accentColor)
             }
 
@@ -177,12 +174,12 @@ struct FileDropZone: View {
                     Text(file.summary)
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
-                        .lineLimit(2)
+                        .lineLimit(3)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
-            Spacer()
+            Spacer(minLength: 4)
 
             // 削除ボタン
             Button(action: {
@@ -281,5 +278,5 @@ struct AudioDropZone: View {
         AudioDropZone(file: nil) { _ in }
     }
     .padding()
-    .frame(width: 400)
+    .frame(width: 300)
 }
