@@ -72,9 +72,12 @@ class FFprobeService {
 
     /// FFprobeバイナリのパス
     var ffprobePath: String? {
+        let fm = FileManager.default
+
         // 1. ダウンロード済みFFprobe（Application Support内）
+        // isExecutableFileはquarantine属性があるとfalseを返すため、fileExistsを使用
         let downloadedPath = FFmpegDownloadService.shared.ffprobePath
-        if FileManager.default.isExecutableFile(atPath: downloadedPath.path) {
+        if fm.fileExists(atPath: downloadedPath.path) {
             return downloadedPath.path
         }
 
@@ -88,14 +91,14 @@ class FFprobeService {
             .deletingLastPathComponent()  // Services/
             .deletingLastPathComponent()  // MP4SoundReplacer/
             .appendingPathComponent("Resources/ffprobe")
-        if FileManager.default.isExecutableFile(atPath: sourceDir.path) {
+        if fm.fileExists(atPath: sourceDir.path) {
             return sourceDir.path
         }
 
         // 4. Homebrew版FFprobe
         let homebrewPaths = ["/opt/homebrew/bin/ffprobe", "/usr/local/bin/ffprobe"]
         for path in homebrewPaths {
-            if FileManager.default.isExecutableFile(atPath: path) {
+            if fm.fileExists(atPath: path) {
                 return path
             }
         }
@@ -106,7 +109,7 @@ class FFprobeService {
     /// FFprobeが利用可能かどうか
     var isAvailable: Bool {
         guard let path = ffprobePath else { return false }
-        return FileManager.default.isExecutableFile(atPath: path)
+        return FileManager.default.fileExists(atPath: path)
     }
 
     /// メディア情報を取得

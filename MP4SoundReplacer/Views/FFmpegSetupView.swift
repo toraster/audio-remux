@@ -3,7 +3,7 @@ import SwiftUI
 /// FFmpegセットアップ画面
 struct FFmpegSetupView: View {
     @StateObject private var downloadService = FFmpegDownloadService.shared
-    var onComplete: () -> Void
+    @Binding var isFFmpegAvailable: Bool
 
     var body: some View {
         VStack(spacing: 24) {
@@ -133,8 +133,11 @@ struct FFmpegSetupView: View {
                 .font(.headline)
                 .foregroundColor(.green)
 
-            Button("続ける") {
-                onComplete()
+            Button(action: {
+                isFFmpegAvailable = true
+            }) {
+                Text("続ける")
+                    .frame(minWidth: 100)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
@@ -210,5 +213,5 @@ struct FFmpegSetupView: View {
 }
 
 #Preview {
-    FFmpegSetupView(onComplete: {})
+    FFmpegSetupView(isFFmpegAvailable: .constant(false))
 }

@@ -3,18 +3,19 @@ import SwiftUI
 @main
 struct MP4SoundReplacerApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @StateObject private var ffmpegChecker = FFmpegAvailabilityChecker()
+    @State private var isFFmpegAvailable = false
 
     var body: some Scene {
         WindowGroup {
             Group {
-                if ffmpegChecker.isAvailable {
+                if isFFmpegAvailable {
                     ContentView()
                 } else {
-                    FFmpegSetupView(onComplete: {
-                        ffmpegChecker.recheck()
-                    })
+                    FFmpegSetupView(isFFmpegAvailable: $isFFmpegAvailable)
                 }
+            }
+            .onAppear {
+                checkFFmpegAvailability()
             }
         }
         .defaultSize(width: 1200, height: 700)
@@ -22,18 +23,16 @@ struct MP4SoundReplacerApp: App {
             CommandGroup(replacing: .newItem) { }
         }
     }
-}
 
-/// FFmpeg利用可能状態を管理するクラス
-@MainActor
-class FFmpegAvailabilityChecker: ObservableObject {
-    @Published var isAvailable = false
+    private func checkFFmpegAvailability() {
+        let ffmpegPath = FFmpegDownloadService.shared.ffmpegPath
+        let ffprobePath = FFmpegDownloadService.shared.ffprobePath
+        let fm = FileManager.default
 
-    init() {
-        recheck()
-    }
+        // isExecutableFileはquarantine属性があるとfalseを返すため、fileExistsを使用
+        let downloadedAvailable = fm.fileExists(atPath: ffmpegPath.path) &&
+                                  fm.fileExists(atPath: ffprobePath.path)
 
-    func recheck() {
-        isAvailable = FFmpegService.shared.isAvailable
+        isFFmpegAvailable = downloadedAvailable || FFmpegService.shared.isAvailable
     }
 }

@@ -16,7 +16,16 @@ class ProjectViewModel: ObservableObject {
 
     /// FFmpegが利用可能か
     var isFFmpegAvailable: Bool {
-        ffmpegService.isAvailable
+        // ダウンロード済みFFmpegを直接チェック（fileExistsを使用）
+        let ffmpegPath = FFmpegDownloadService.shared.ffmpegPath
+        let ffprobePath = FFmpegDownloadService.shared.ffprobePath
+        let fm = FileManager.default
+
+        // isExecutableFileはquarantine属性があるとfalseを返すため、fileExistsを使用
+        let downloadedAvailable = fm.fileExists(atPath: ffmpegPath.path) &&
+                                  fm.fileExists(atPath: ffprobePath.path)
+
+        return downloadedAvailable || ffmpegService.isAvailable
     }
 
     /// 動画ファイルを設定
