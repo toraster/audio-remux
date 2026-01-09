@@ -11,11 +11,14 @@ struct WaveformSyncView: View {
 
     @State private var isExpanded = true
 
-    /// ズームレベル（1.0 = 全体表示、100.0 = 最大ズーム）
+    /// ズームレベル（1.0 = 全体表示、200.0 = 最大ズーム）
     @State private var zoomLevel: Double = 1.0
 
     /// 表示開始位置（秒）
     @State private var scrollPosition: Double = 0
+
+    /// カーソル位置（秒）
+    @State private var cursorPosition: Double? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -109,13 +112,18 @@ struct WaveformSyncView: View {
 
     private var zoomControlSection: some View {
         HStack(spacing: 8) {
-            // ズームスライダー
+            // ズームスライダー（カーソル位置基準）
             HStack(spacing: 3) {
                 Image(systemName: "minus.magnifyingglass")
                     .foregroundColor(.secondary)
                     .font(.system(size: 10))
 
-                Slider(value: $zoomLevel, in: 1...100) { _ in }
+                Slider(value: Binding(
+                    get: { zoomLevel },
+                    set: { newZoom in
+                        setZoomWithAnchor(newZoom)
+                    }
+                ), in: 1...200) { _ in }
                     .frame(width: 120)
 
                 Image(systemName: "plus.magnifyingglass")
@@ -126,7 +134,7 @@ struct WaveformSyncView: View {
             Text("\(Int(zoomLevel))x")
                 .font(.system(size: 11))
                 .foregroundColor(.secondary)
-                .frame(width: 32, alignment: .leading)
+                .frame(width: 40, alignment: .leading)
 
             Spacer()
 
@@ -187,6 +195,31 @@ struct WaveformSyncView: View {
         )
     }
 
+    /// カーソル位置またはビュー中央を基準にズームを設定
+    private func setZoomWithAnchor(_ newZoom: Double) {
+        let effectiveDuration = maxDuration
+        let oldVisibleDuration = effectiveDuration / zoomLevel
+        let newVisibleDuration = effectiveDuration / newZoom
+
+        // カーソル位置、またはビュー中央を基準点とする
+        let anchorTime: Double
+        let anchorRatio: Double
+        if let cursor = cursorPosition {
+            anchorTime = cursor
+            anchorRatio = (anchorTime - scrollPosition) / oldVisibleDuration
+        } else {
+            anchorTime = scrollPosition + oldVisibleDuration / 2
+            anchorRatio = 0.5
+        }
+
+        // 基準点が同じ相対位置に留まるよう調整
+        let newScrollPosition = anchorTime - (anchorRatio * newVisibleDuration)
+        let maxScroll = max(0, effectiveDuration - newVisibleDuration)
+
+        zoomLevel = newZoom
+        scrollPosition = max(0, min(maxScroll, newScrollPosition))
+    }
+
     // MARK: - Waveform Section
 
     private var waveformSection: some View {
@@ -201,7 +234,8 @@ struct WaveformSyncView: View {
                 scrollPosition: $scrollPosition,
                 isDraggable: false,
                 offsetSeconds: .constant(0),
-                maxDuration: maxDuration
+                maxDuration: maxDuration,
+                cursorPosition: $cursorPosition
             )
 
             // 置換音声波形（ドラッグ可能）
@@ -214,7 +248,8 @@ struct WaveformSyncView: View {
                 scrollPosition: $scrollPosition,
                 isDraggable: true,
                 offsetSeconds: $offsetSeconds,
-                maxDuration: maxDuration
+                maxDuration: maxDuration,
+                cursorPosition: $cursorPosition
             )
             .onChange(of: offsetSeconds) { newValue in
                 onOffsetChanged(newValue)
