@@ -7,3 +7,9 @@ MP4SoundReplacer/Resources/ffprobe
 # Swift Package Manager
 .build/
 .swiftpm/
+
+# Build outputs
+build/
+
+# Claude Code
+.claude/
