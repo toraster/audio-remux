@@ -1,8 +1,8 @@
 .DS_Store
 
 # FFmpeg binaries (download from https://evermeet.cx/ffmpeg/)
-MP4SoundReplacer/Resources/ffmpeg
-MP4SoundReplacer/Resources/ffprobe
+AudioRemux/Resources/ffmpeg
+AudioRemux/Resources/ffprobe
 
 # Swift Package Manager
 .build/

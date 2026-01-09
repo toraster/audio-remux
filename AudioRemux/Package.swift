@@ -2,13 +2,13 @@
 import PackageDescription
 
 let package = Package(
-    name: "MP4SoundReplacer",
+    name: "AudioRemux",
     platforms: [
         .macOS(.v13)
     ],
     targets: [
         .executableTarget(
-            name: "MP4SoundReplacer",
+            name: "AudioRemux",
             path: ".",
             exclude: ["Resources", "Entitlements"],
             sources: ["App", "Models", "Views", "ViewModels", "Services"]

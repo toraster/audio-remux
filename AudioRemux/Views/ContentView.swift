@@ -103,7 +103,7 @@ struct ContentView: View {
                     )
             }
 
-            Text("MP4 Sound Replacer")
+            Text("Audio Remux")
                 .font(.system(size: 17, weight: .bold, design: .rounded))
 
             Spacer()
