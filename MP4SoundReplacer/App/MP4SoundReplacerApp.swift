@@ -8,6 +8,7 @@ struct MP4SoundReplacerApp: App {
         WindowGroup {
             ContentView()
         }
+        .defaultSize(width: 800, height: 600)
         .commands {
             CommandGroup(replacing: .newItem) { }
         }

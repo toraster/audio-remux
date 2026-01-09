@@ -105,6 +105,11 @@ class FFprobeService {
 
     /// メディア情報を取得
     func getMediaInfo(url: URL) async throws -> MediaFile {
+        // ファイル存在チェック
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            throw FFprobeError.executionFailed("ファイルが見つかりません: \(url.lastPathComponent)")
+        }
+
         guard let path = ffprobePath else {
             throw FFprobeError.binaryNotFound
         }
@@ -329,6 +334,12 @@ class FFprobeService {
                     mediaFile.duration = duration
                 }
             }
+        }
+
+        // ファイルサイズを取得
+        if let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+           let fileSize = attributes[.size] as? Int64 {
+            mediaFile.fileSize = fileSize
         }
 
         return mediaFile
