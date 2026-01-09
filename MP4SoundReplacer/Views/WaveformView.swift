@@ -7,7 +7,7 @@ struct ZoomableWaveformView: View {
     let label: String
     let duration: TimeInterval
 
-    /// ズームレベル（1.0 = 全体表示、100.0 = 最大ズーム）
+    /// ズームレベル（1.0 = 全体表示、200.0 = 最大ズーム）
     @Binding var zoomLevel: Double
 
     /// 表示開始位置（秒）
@@ -21,6 +21,9 @@ struct ZoomableWaveformView: View {
 
     /// 最大表示時間（スクロール制限用）
     var maxDuration: TimeInterval = 0
+
+    /// カーソル位置（秒）。nilの場合はカーソル非表示
+    @Binding var cursorPosition: Double?
 
     /// ドラッグ中の一時オフセット（秒単位）
     @State private var dragOffsetSeconds: Double = 0
@@ -68,32 +71,40 @@ struct ZoomableWaveformView: View {
 
     private func waveformArea(geometry: GeometryProxy) -> some View {
         let width = geometry.size.width
+        let effectiveDuration = maxDuration > 0 ? maxDuration : duration
+        let visibleDuration = effectiveDuration / zoomLevel
+        let pixelsPerSecond = width / visibleDuration
 
-        return ZStack {
+        return ZStack(alignment: .leading) {
             if let waveform = waveform {
-                // 表示範囲の計算
-                let effectiveDuration = maxDuration > 0 ? maxDuration : duration
-                let visibleDuration = effectiveDuration / zoomLevel
-
-                // ドラッグ可能な波形はオフセットを考慮して表示位置を調整
+                // ドラッグ可能な波形はオフセットを考慮
                 let totalOffset = isDraggable ? (offsetSeconds + dragOffsetSeconds) : 0
-                let adjustedStartTime = scrollPosition - totalOffset
-                let startTime = max(0, adjustedStartTime)
-                let endTime = min(startTime + visibleDuration, duration)
 
-                // サンプルの取得
-                let samples = waveform.samples(from: startTime, to: endTime)
-                let downsampled = downsample(samples, to: Int(width))
+                // 波形データの取得範囲（オフセットを考慮）
+                // 画面上の scrollPosition に表示されるべき波形の時間 = scrollPosition - totalOffset
+                let dataStartTime = max(0, scrollPosition - totalOffset)
+                let dataEndTime = min(duration, scrollPosition + visibleDuration - totalOffset)
 
-                // オフセットによるピクセル位置の調整
-                let pixelsPerSecond = width / visibleDuration
-                let pixelOffset = isDraggable ? (totalOffset * pixelsPerSecond) : 0
+                // サンプルの取得（取得範囲が有効な場合のみ）
+                if dataStartTime < dataEndTime {
+                    let samples = waveform.samples(from: dataStartTime, to: dataEndTime)
 
-                WaveformCanvas(samples: downsampled, color: color)
-                    .offset(x: pixelOffset)
-                    .gesture(isDraggable ? dragGesture(width: width) : nil)
-            } else {
-                // プレースホルダー
+                    // 取得したデータの時間幅に対応するピクセル幅
+                    let dataWidth = CGFloat((dataEndTime - dataStartTime) * pixelsPerSecond)
+                    let downsampled = downsample(samples, to: max(1, Int(dataWidth)))
+
+                    // 描画位置: dataStartTime が画面上のどこに表示されるか
+                    // dataStartTime の画面位置 = (dataStartTime + totalOffset - scrollPosition) * pixelsPerSecond
+                    let drawOffset = CGFloat((dataStartTime + totalOffset - scrollPosition) * pixelsPerSecond)
+
+                    WaveformCanvas(samples: downsampled, color: color)
+                        .frame(width: dataWidth, height: 60)
+                        .offset(x: drawOffset)
+                }
+            }
+
+            // プレースホルダー（波形がない場合）
+            if waveform == nil {
                 RoundedRectangle(cornerRadius: 4)
                     .fill(Color.gray.opacity(0.2))
                     .overlay(
@@ -102,31 +113,48 @@ struct ZoomableWaveformView: View {
                             .foregroundColor(.secondary)
                     )
             }
+
+            // タイムラインカーソル（縦線）
+            if let cursor = cursorPosition {
+                let relativeTime = cursor - scrollPosition
+                if relativeTime >= 0 && relativeTime <= visibleDuration {
+                    let xPosition = CGFloat(relativeTime / visibleDuration) * width
+                    TimelineCursorView(cursorTime: cursor)
+                        .position(x: xPosition, y: 30)
+                }
+            }
+
         }
         .frame(height: 60)
         .clipped()
-        .onScrollGesture { delta, event in
-            handleScroll(delta: delta, event: event, width: width)
+        .overlay(
+            // クリック＆ドラッグ検出
+            WaveformInteractionView(
+                isDraggable: isDraggable,
+                width: width,
+                visibleDuration: visibleDuration,
+                scrollPosition: scrollPosition,
+                effectiveDuration: effectiveDuration,
+                onCursorSet: { xPosition in
+                    let clickedTime = scrollPosition + (Double(xPosition) / Double(width)) * visibleDuration
+                    cursorPosition = max(0, min(effectiveDuration, clickedTime))
+                },
+                onDragChanged: { dragDelta in
+                    let secondsPerPixel = visibleDuration / Double(width)
+                    dragOffsetSeconds = Double(dragDelta) * secondsPerPixel
+                },
+                onDragEnded: {
+                    offsetSeconds += dragOffsetSeconds
+                    dragOffsetSeconds = 0
+                }
+            )
+        )
+        .onScrollGesture { delta, event, mouseXRatio in
+            handleScroll(delta: delta, event: event, mouseXRatio: mouseXRatio, width: width)
         }
     }
 
-    private func dragGesture(width: CGFloat) -> some Gesture {
-        DragGesture()
-            .onChanged { value in
-                // ドラッグ距離を秒に変換（一時的なオフセット）
-                let effectiveDuration = maxDuration > 0 ? maxDuration : duration
-                let visibleDuration = effectiveDuration / zoomLevel
-                let secondsPerPixel = visibleDuration / Double(width)
-                dragOffsetSeconds = Double(value.translation.width) * secondsPerPixel
-            }
-            .onEnded { _ in
-                // ドラッグ完了時にオフセットを確定
-                offsetSeconds += dragOffsetSeconds
-                dragOffsetSeconds = 0
-            }
-    }
-
-    private func handleScroll(delta: CGFloat, event: NSEvent, width: CGFloat) {
+    private func handleScroll(delta: CGFloat, event: NSEvent, mouseXRatio: CGFloat, width: CGFloat) {
         // Shiftキーでスクロール、通常はズーム
         if event.modifierFlags.contains(.shift) || abs(event.deltaX) > abs(event.deltaY) {
             // 水平スクロール
@@ -136,10 +164,25 @@ struct ZoomableWaveformView: View {
             let maxScroll = max(0, effectiveDuration - visibleDuration)
             scrollPosition = max(0, min(maxScroll, scrollPosition - scrollDelta))
         } else {
-            // ズーム（上スクロールでズームイン、下スクロールでズームアウト）
+            // ズーム（マウス位置を基準点として）
+            let effectiveDuration = maxDuration > 0 ? maxDuration : duration
+            let oldVisibleDuration = effectiveDuration / zoomLevel
+
+            // マウス位置の時間を計算
+            let clampedRatio = min(1.0, max(0.0, Double(mouseXRatio)))
+            let mouseTime = scrollPosition + (clampedRatio * oldVisibleDuration)
+
+            // 新しいズームレベルを計算（上限200倍）
             let zoomFactor = 1.0 + Double(delta) * 0.05
-            let newZoom = max(1.0, min(100.0, zoomLevel * zoomFactor))
+            let newZoom = max(1.0, min(200.0, zoomLevel * zoomFactor))
+            let newVisibleDuration = effectiveDuration / newZoom
+
+            // マウス位置が同じ相対位置に留まるようにスクロール位置を調整
+            let newScrollPosition = mouseTime - (clampedRatio * newVisibleDuration)
+            let maxScroll = max(0, effectiveDuration - newVisibleDuration)
+
             zoomLevel = newZoom
+            scrollPosition = max(0, min(maxScroll, newScrollPosition))
         }
     }
 
@@ -243,8 +286,11 @@ struct TimelineView: View {
         let targetTicks = 15.0
         let rawInterval = visibleDuration / targetTicks
 
-        // 適切な間隔に丸める
-        let intervals: [TimeInterval] = [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0, 10.0, 30.0, 60.0]
+        // 適切な間隔に丸める（200倍ズーム対応: より細かい間隔を追加）
+        let intervals: [TimeInterval] = [
+            0.0005, 0.001, 0.002, 0.005, 0.01, 0.02, 0.05,
+            0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0
+        ]
         return intervals.first { $0 >= rawInterval } ?? 60.0
     }
 
@@ -271,18 +317,19 @@ struct TimelineView: View {
 
 /// スクロールジェスチャーのビューモディファイア
 struct ScrollGestureModifier: ViewModifier {
-    let action: (CGFloat, NSEvent) -> Void
+    let action: (CGFloat, NSEvent, CGFloat) -> Void
 
     func body(content: Content) -> some View {
-        content.background(
+        content.overlay(
             ScrollGestureView(action: action)
+                .allowsHitTesting(true)
         )
     }
 }
 
 /// NSViewを使ったスクロールジェスチャー検出
 struct ScrollGestureView: NSViewRepresentable {
-    let action: (CGFloat, NSEvent) -> Void
+    let action: (CGFloat, NSEvent, CGFloat) -> Void
 
     func makeNSView(context: Context) -> NSView {
         let view = ScrollDetectorView()
@@ -297,16 +344,50 @@ struct ScrollGestureView: NSViewRepresentable {
     }
 
     class ScrollDetectorView: NSView {
-        var action: ((CGFloat, NSEvent) -> Void)?
+        var action: ((CGFloat, NSEvent, CGFloat) -> Void)?
+        private var trackingArea: NSTrackingArea?
+
+        override var acceptsFirstResponder: Bool { true }
+
+        override func updateTrackingAreas() {
+            super.updateTrackingAreas()
+
+            if let existingArea = trackingArea {
+                removeTrackingArea(existingArea)
+            }
+
+            let options: NSTrackingArea.Options = [
+                .mouseEnteredAndExited,
+                .activeInKeyWindow,
+                .inVisibleRect
+            ]
+
+            trackingArea = NSTrackingArea(
+                rect: bounds,
+                options: options,
+                owner: self,
+                userInfo: nil
+            )
+
+            if let area = trackingArea {
+                addTrackingArea(area)
+            }
+        }
+
+        override func mouseEntered(with event: NSEvent) {
+            window?.makeFirstResponder(self)
+        }
 
         override func scrollWheel(with event: NSEvent) {
-            action?(event.deltaY, event)
+            let localPoint = convert(event.locationInWindow, from: nil)
+            let xRatio = bounds.width > 0 ? localPoint.x / bounds.width : 0.5
+            action?(event.deltaY, event, xRatio)
         }
     }
 }
 
 extension View {
-    func onScrollGesture(action: @escaping (CGFloat, NSEvent) -> Void) -> some View {
+    func onScrollGesture(action: @escaping (CGFloat, NSEvent, CGFloat) -> Void) -> some View {
         modifier(ScrollGestureModifier(action: action))
     }
 }
@@ -395,6 +476,157 @@ struct WaveformBarsShape: Shape {
     }
 }
 
+/// タイムラインカーソル（プレイヘッド風縦線）
+struct TimelineCursorView: View {
+    let cursorTime: Double
+
+    @State private var isHovered = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // 上部ハンドル（下向き三角形）
+            CursorHandleShape()
+                .fill(Color.white.opacity(0.9))
+                .frame(width: 10, height: 6)
+
+            // 縦線
+            Rectangle()
+                .fill(
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.9), Color.white.opacity(0.5)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .frame(width: 1.5, height: 48)
+
+            // 時間表示（ホバー時）
+            if isHovered {
+                Text(formatCursorTime(cursorTime))
+                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 2)
+                    .background(
+                        Capsule()
+                            .fill(Color.gray.opacity(0.8))
+                    )
+                    .offset(y: 2)
+            }
+        }
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isHovered = hovering
+            }
+        }
+    }
+
+    private func formatCursorTime(_ time: Double) -> String {
+        let minutes = Int(time) / 60
+        let seconds = time - Double(minutes * 60)
+        if minutes > 0 {
+            return String(format: "%d:%06.3f", minutes, seconds)
+        } else {
+            return String(format: "%.3fs", seconds)
+        }
+    }
+}
+
+/// カーソルハンドル形状（下向き三角形）
+struct CursorHandleShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.midX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        path.closeSubpath()
+        return path
+    }
+}
+
+/// 波形のクリック＆ドラッグ検出用ビュー
+struct WaveformInteractionView: NSViewRepresentable {
+    let isDraggable: Bool
+    let width: CGFloat
+    let visibleDuration: Double
+    let scrollPosition: Double
+    let effectiveDuration: Double
+    let onCursorSet: (CGFloat) -> Void
+    let onDragChanged: (CGFloat) -> Void
+    let onDragEnded: () -> Void
+
+    func makeNSView(context: Context) -> WaveformInteractionNSView {
+        let view = WaveformInteractionNSView()
+        view.isDraggable = isDraggable
+        view.onCursorSet = onCursorSet
+        view.onDragChanged = onDragChanged
+        view.onDragEnded = onDragEnded
+        return view
+    }
+
+    func updateNSView(_ nsView: WaveformInteractionNSView, context: Context) {
+        nsView.isDraggable = isDraggable
+        nsView.onCursorSet = onCursorSet
+        nsView.onDragChanged = onDragChanged
+        nsView.onDragEnded = onDragEnded
+    }
+
+    class WaveformInteractionNSView: NSView {
+        var isDraggable: Bool = false
+        var onCursorSet: ((CGFloat) -> Void)?
+        var onDragChanged: ((CGFloat) -> Void)?
+        var onDragEnded: (() -> Void)?
+
+        private var mouseDownTime: Date?
+        private var mouseDownLocation: NSPoint?
+        private var isDragging: Bool = false
+
+        override func mouseDown(with event: NSEvent) {
+            mouseDownTime = Date()
+            mouseDownLocation = convert(event.locationInWindow, from: nil)
+            isDragging = false
+        }
+
+        override func mouseDragged(with event: NSEvent) {
+            guard isDraggable,
+                  let downLocation = mouseDownLocation else { return }
+
+            let currentLocation = convert(event.locationInWindow, from: nil)
+            let dragDelta = currentLocation.x - downLocation.x
+
+            // 5px以上動いたらドラッグと判定
+            if abs(dragDelta) > 5 || isDragging {
+                isDragging = true
+                onDragChanged?(dragDelta)
+            }
+        }
+
+        override func mouseUp(with event: NSEvent) {
+            defer {
+                mouseDownTime = nil
+                mouseDownLocation = nil
+            }
+
+            if isDragging {
+                // ドラッグ終了
+                isDragging = false
+                onDragEnded?()
+            } else if let downTime = mouseDownTime,
+                      let downLocation = mouseDownLocation {
+                // クリック判定
+                let upLocation = convert(event.locationInWindow, from: nil)
+                let elapsed = Date().timeIntervalSince(downTime)
+                let distance = hypot(upLocation.x - downLocation.x, upLocation.y - downLocation.y)
+
+                // 短時間（0.3秒以内）かつ移動距離が小さい（5px以内）場合のみクリック
+                if elapsed < 0.3 && distance < 5 {
+                    onCursorSet?(upLocation.x)
+                }
+            }
+        }
+    }
+}
+
 /// シンプルな波形表示（後方互換用）
 struct WaveformView: View {
     let waveform: WaveformData?
@@ -412,7 +644,8 @@ struct WaveformView: View {
             scrollPosition: .constant(0),
             isDraggable: false,
             offsetSeconds: .constant(0),
-            maxDuration: waveform?.duration ?? 0
+            maxDuration: waveform?.duration ?? 0,
+            cursorPosition: .constant(nil)
         )
     }
 }
@@ -432,7 +665,8 @@ struct WaveformView: View {
             scrollPosition: .constant(0),
             isDraggable: false,
             offsetSeconds: .constant(0),
-            maxDuration: 120.5
+            maxDuration: 120.5,
+            cursorPosition: .constant(60.0)
         )
 
         ZoomableWaveformView(
@@ -448,7 +682,8 @@ struct WaveformView: View {
             scrollPosition: .constant(0),
             isDraggable: true,
             offsetSeconds: .constant(0.5),
-            maxDuration: 120.5
+            maxDuration: 120.5,
+            cursorPosition: .constant(60.0)
         )
     }
     .padding()
