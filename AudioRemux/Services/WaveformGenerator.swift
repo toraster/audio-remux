@@ -65,8 +65,8 @@ class WaveformGenerator {
         let channelData = floatChannelData[0]
         let sampleCount = Int(buffer.frameLength)
 
-        // 表示用にダウンサンプリング（100Hz程度）
-        let targetSampleRate = 100
+        // 分析用にダウンサンプリング（200Hz：5ms精度対応）
+        let targetSampleRate = 200
         let originalSampleRate = Int(format.sampleRate)
         let downsampleRatio = max(1, originalSampleRate / targetSampleRate)
 
