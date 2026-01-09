@@ -125,11 +125,13 @@ struct ExportSettingsView: View {
                 }
 
                 // 微調整ボタン（横並び）
-                HStack(spacing: 5) {
+                HStack(spacing: 4) {
+                    offsetButton("-0.1", value: -0.1)
                     offsetButton("-0.01", value: -0.01)
                     offsetButton("-0.001", value: -0.001)
                     offsetButton("+0.001", value: +0.001)
                     offsetButton("+0.01", value: +0.01)
+                    offsetButton("+0.1", value: +0.1)
                 }
 
                 Button(action: {
