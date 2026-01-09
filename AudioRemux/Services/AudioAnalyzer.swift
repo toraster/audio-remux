@@ -40,7 +40,7 @@ class AudioAnalyzer {
         reference: WaveformData,
         target: WaveformData
     ) async throws -> SyncAnalysisResult {
-        // サンプルレートは同じ前提（WaveformGeneratorが100Hzにダウンサンプリング）
+        // サンプルレートは同じ前提（WaveformGeneratorが200Hzにダウンサンプリング）
         let sampleRate = reference.sampleRate
 
         // 分析ウィンドウのサンプル数
@@ -72,6 +72,40 @@ class AudioAnalyzer {
                 }
             }
         }
+    }
+
+    /// サブサンプル精度のピーク位置を放物線補間で計算
+    /// - Parameters:
+    ///   - correlations: 相関値の配列
+    ///   - peakIndex: 最大相関のインデックス
+    /// - Returns: 補間されたピーク位置（サブサンプル精度）
+    private func parabolicInterpolation(
+        correlations: [Float],
+        peakIndex: Int
+    ) -> Double {
+        // 境界チェック（補間に3点必要）
+        guard peakIndex > 0 && peakIndex < correlations.count - 1 else {
+            return Double(peakIndex)
+        }
+
+        let y0 = Double(correlations[peakIndex - 1])
+        let y1 = Double(correlations[peakIndex])
+        let y2 = Double(correlations[peakIndex + 1])
+
+        // 放物線の頂点: δ = (y0 - y2) / (2 * (y0 - 2*y1 + y2))
+        let denominator = 2.0 * (y0 - 2.0 * y1 + y2)
+
+        // 数値安定性のチェック
+        guard abs(denominator) > 1e-10 else {
+            return Double(peakIndex)
+        }
+
+        let delta = (y0 - y2) / denominator
+
+        // 補間値が妥当な範囲内か確認（-0.5 < delta < 0.5）
+        let clampedDelta = max(-0.5, min(0.5, delta))
+
+        return Double(peakIndex) + clampedDelta
     }
 
     /// 相互相関を計算してオフセットを検出
@@ -147,8 +181,14 @@ class AudioAnalyzer {
         var maxIndex: vDSP_Length = 0
         vDSP_maxvi(correlations, 1, &maxCorrelation, &maxIndex, vDSP_Length(correlationSize))
 
-        let bestLag = Int(maxIndex) - maxLag
-        let offsetSeconds = Double(bestLag) / Double(sampleRate)
+        // サブサンプル精度で補間
+        let refinedIndex = parabolicInterpolation(
+            correlations: correlations,
+            peakIndex: Int(maxIndex)
+        )
+
+        let bestLag = refinedIndex - Double(maxLag)
+        let offsetSeconds = bestLag / Double(sampleRate)
 
         // 信頼度を0-1に正規化（相関係数は-1〜1の範囲）
         let confidence = Double(max(0, maxCorrelation))
