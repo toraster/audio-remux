@@ -49,7 +49,7 @@ struct ZoomableWaveformView: View {
                     waveformArea(geometry: geometry)
                 }
             }
-            .frame(height: 76)
+            .frame(height: 96)
         }
     }
 
@@ -98,7 +98,7 @@ struct ZoomableWaveformView: View {
                     let drawOffset = CGFloat((dataStartTime + totalOffset - scrollPosition) * pixelsPerSecond)
 
                     WaveformCanvas(samples: downsampled, color: color)
-                        .frame(width: dataWidth, height: 60)
+                        .frame(width: dataWidth, height: 80)
                         .offset(x: drawOffset)
                 }
             }
@@ -126,7 +126,7 @@ struct ZoomableWaveformView: View {
 
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .frame(height: 60)
+        .frame(height: 80)
         .clipped()
         .overlay(
             // クリック＆ドラッグ検出
@@ -241,10 +241,11 @@ struct TimelineView: View {
                             .fill(Color.secondary.opacity(0.5))
                             .frame(width: 1, height: tick.isMajor ? 8 : 4)
 
-                        if tick.isMajor {
+                        if tick.isMajor && shouldShowLabel(at: tick.position) {
                             Text(formatTime(tick.time))
                                 .font(.system(size: 8))
                                 .foregroundColor(.secondary)
+                                .fixedSize()
                         }
                     }
                     .position(x: tick.position, y: 8)
@@ -296,13 +297,15 @@ struct TimelineView: View {
     }
 
     private func formatTime(_ time: TimeInterval) -> String {
-        if time < 60 {
-            return String(format: "%.2f", time)
-        } else {
-            let minutes = Int(time) / 60
-            let seconds = time - Double(minutes * 60)
-            return String(format: "%d:%05.2f", minutes, seconds)
-        }
+        let minutes = Int(time) / 60
+        let seconds = time - Double(minutes * 60)
+        return String(format: "%d:%05.2f", minutes, seconds)
+    }
+
+    /// 左端・右端付近のラベルは非表示（はみ出し防止）
+    private func shouldShowLabel(at position: CGFloat) -> Bool {
+        let labelHalfWidth: CGFloat = 22  // "0:00.00" の半分程度
+        return position >= labelHalfWidth && position <= width - labelHalfWidth
     }
 
     struct TickMark: Hashable {
