@@ -9,8 +9,6 @@ struct WaveformSyncView: View {
     let onOffsetChanged: (Double) -> Void
     let onResetOffset: () -> Void
 
-    @State private var isExpanded = true
-
     /// ズームレベル（1.0 = 全体表示、200.0 = 最大ズーム）
     @State private var zoomLevel: Double = 1.0
 
@@ -21,37 +19,33 @@ struct WaveformSyncView: View {
     @State private var cursorPosition: Double? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             // ヘッダー
             headerView
 
-            if isExpanded {
-                // ズームコントロール
-                zoomControlSection
-                    .padding(.horizontal, 2)
+            // ズームコントロール
+            zoomControlSection
+                .padding(.horizontal, 2)
 
-                // 波形表示エリア
-                waveformSection
-                    .padding(.vertical, 2)
+            // 波形表示エリア
+            waveformSection
 
-                // 区切り線
-                Rectangle()
-                    .fill(Color.secondary.opacity(0.15))
-                    .frame(height: 1)
-                    .padding(.horizontal, 2)
+            // 区切り線
+            Rectangle()
+                .fill(Color.secondary.opacity(0.15))
+                .frame(height: 1)
+                .padding(.horizontal, 2)
 
-                // 同期コントロール
-                syncControlSection
-                    .padding(.horizontal, 2)
-            }
+            // 同期コントロール
+            syncControlSection
+                .padding(.horizontal, 2)
         }
-        .padding(10)
+        .padding(6)
         .background(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: 10)
                 .fill(Color(NSColor.controlBackgroundColor))
-                .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+                .shadow(color: Color.black.opacity(0.03), radius: 3, x: 0, y: 1)
         )
-        .animation(.easeInOut(duration: 0.3), value: isExpanded)
     }
 
     // MARK: - Header
@@ -92,19 +86,6 @@ struct WaveformSyncView: View {
                 )
             }
 
-            // 展開/折りたたみボタン
-            Button(action: { withAnimation { isExpanded.toggle() } }) {
-                ZStack {
-                    Circle()
-                        .fill(Color(NSColor.controlBackgroundColor))
-                        .frame(width: 26, height: 26)
-
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.secondary)
-                }
-            }
-            .buttonStyle(.plain)
         }
     }
 
