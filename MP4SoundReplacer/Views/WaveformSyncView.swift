@@ -18,7 +18,7 @@ struct WaveformSyncView: View {
     @State private var scrollPosition: Double = 0
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
             // ヘッダー
             headerView
 
@@ -29,7 +29,7 @@ struct WaveformSyncView: View {
 
                 // 波形表示エリア
                 waveformSection
-                    .padding(.vertical, 4)
+                    .padding(.vertical, 2)
 
                 // 区切り線
                 Rectangle()
@@ -42,11 +42,11 @@ struct WaveformSyncView: View {
                     .padding(.horizontal, 2)
             }
         }
-        .padding(14)
+        .padding(10)
         .background(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: 12)
                 .fill(Color(NSColor.controlBackgroundColor))
-                .shadow(color: Color.black.opacity(0.05), radius: 6, x: 0, y: 2)
+                .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
         )
         .animation(.easeInOut(duration: 0.3), value: isExpanded)
     }
@@ -54,10 +54,10 @@ struct WaveformSyncView: View {
     // MARK: - Header
 
     private var headerView: some View {
-        HStack(spacing: 10) {
-            HStack(spacing: 6) {
+        HStack(spacing: 8) {
+            HStack(spacing: 5) {
                 Image(systemName: "waveform.badge.magnifyingglass")
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(
                         LinearGradient(
                             colors: [Color.accentColor, Color.accentColor.opacity(0.7)],
@@ -67,22 +67,22 @@ struct WaveformSyncView: View {
                     )
 
                 Text("音声同期")
-                    .font(.system(size: 16, weight: .bold))
+                    .font(.system(size: 14, weight: .bold))
             }
 
             Spacer()
 
             // 状態インジケーター
             if syncViewModel.syncState.isProcessing {
-                HStack(spacing: 8) {
+                HStack(spacing: 6) {
                     ProgressView()
-                        .scaleEffect(0.7)
+                        .scaleEffect(0.6)
                     Text(syncViewModel.syncState.statusMessage)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.secondary)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
                 .background(
                     Capsule()
                         .fill(Color.accentColor.opacity(0.08))
@@ -94,10 +94,10 @@ struct WaveformSyncView: View {
                 ZStack {
                     Circle()
                         .fill(Color(NSColor.controlBackgroundColor))
-                        .frame(width: 30, height: 30)
+                        .frame(width: 26, height: 26)
 
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(.secondary)
                 }
             }
@@ -108,46 +108,48 @@ struct WaveformSyncView: View {
     // MARK: - Zoom Control Section
 
     private var zoomControlSection: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 8) {
             // ズームスライダー
-            HStack(spacing: 4) {
+            HStack(spacing: 3) {
                 Image(systemName: "minus.magnifyingglass")
                     .foregroundColor(.secondary)
-                    .font(.caption)
+                    .font(.system(size: 10))
 
                 Slider(value: $zoomLevel, in: 1...100) { _ in }
-                    .frame(width: 150)
+                    .frame(width: 120)
 
                 Image(systemName: "plus.magnifyingglass")
                     .foregroundColor(.secondary)
-                    .font(.caption)
+                    .font(.system(size: 10))
             }
 
             Text("\(Int(zoomLevel))x")
-                .font(.callout)
+                .font(.system(size: 11))
                 .foregroundColor(.secondary)
-                .frame(width: 40, alignment: .leading)
+                .frame(width: 32, alignment: .leading)
 
             Spacer()
 
             // スクロール位置（ズーム中のみ表示）
             if zoomLevel > 1 {
-                HStack(spacing: 4) {
+                HStack(spacing: 3) {
                     Button(action: { scrollPosition = max(0, scrollPosition - scrollStep) }) {
                         Image(systemName: "chevron.left")
                     }
                     .buttonStyle(.bordered)
+                    .controlSize(.small)
                     .disabled(scrollPosition <= 0)
 
                     Text(formatTime(scrollPosition))
-                        .font(.callout)
+                        .font(.system(size: 11))
                         .foregroundColor(.secondary)
-                        .frame(width: 70)
+                        .frame(width: 60)
 
                     Button(action: { scrollPosition = min(maxScrollPosition, scrollPosition + scrollStep) }) {
                         Image(systemName: "chevron.right")
                     }
                     .buttonStyle(.bordered)
+                    .controlSize(.small)
                     .disabled(scrollPosition >= maxScrollPosition)
                 }
             }
@@ -158,9 +160,10 @@ struct WaveformSyncView: View {
                 scrollPosition = 0
             }) {
                 Image(systemName: "arrow.counterclockwise")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 10, weight: .semibold))
             }
             .buttonStyle(.bordered)
+            .controlSize(.small)
             .disabled(zoomLevel == 1.0 && scrollPosition == 0)
             .help("ズームをリセット")
         }
@@ -187,7 +190,7 @@ struct WaveformSyncView: View {
     // MARK: - Waveform Section
 
     private var waveformSection: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 6) {
             // 元動画の音声波形
             ZoomableWaveformView(
                 waveform: syncViewModel.videoWaveform,
@@ -222,9 +225,9 @@ struct WaveformSyncView: View {
     // MARK: - Sync Control Section
 
     private var syncControlSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             // 自動同期ボタン
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 Button(action: {
                     Task {
                         guard let videoURL = videoURL, let audioURL = audioURL else { return }
@@ -246,14 +249,14 @@ struct WaveformSyncView: View {
                         }
                     }
                 }) {
-                    HStack(spacing: 8) {
+                    HStack(spacing: 6) {
                         Image(systemName: "waveform.badge.magnifyingglass")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: 12, weight: .semibold))
                         Text("自動同期")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: 12, weight: .semibold))
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
                     .background(
                         LinearGradient(
                             colors: [Color.accentColor, Color.accentColor.opacity(0.85)],
@@ -262,8 +265,8 @@ struct WaveformSyncView: View {
                         )
                     )
                     .foregroundColor(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .shadow(color: Color.accentColor.opacity(0.3), radius: 6, x: 0, y: 3)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .shadow(color: Color.accentColor.opacity(0.3), radius: 4, x: 0, y: 2)
                 }
                 .buttonStyle(.plain)
                 .disabled(videoURL == nil || audioURL == nil || syncViewModel.syncState.isProcessing)
@@ -275,19 +278,19 @@ struct WaveformSyncView: View {
                         onResetOffset()
                     }
                 }) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 5) {
                         Image(systemName: "arrow.counterclockwise")
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.system(size: 11, weight: .semibold))
                         Text("オフセットをリセット")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: 12, weight: .semibold))
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
                     .background(
-                        RoundedRectangle(cornerRadius: 10)
+                        RoundedRectangle(cornerRadius: 8)
                             .fill(Color(NSColor.controlBackgroundColor))
                             .overlay(
-                                RoundedRectangle(cornerRadius: 10)
+                                RoundedRectangle(cornerRadius: 8)
                                     .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
                             )
                     )
@@ -300,25 +303,25 @@ struct WaveformSyncView: View {
 
                 // 結果表示
                 if let result = syncViewModel.lastResult {
-                    VStack(alignment: .trailing, spacing: 4) {
+                    VStack(alignment: .trailing, spacing: 2) {
                         Text("検出: \(String(format: "%.3f", result.detectedOffset))秒")
-                            .font(.system(size: 13, weight: .semibold))
-                        HStack(spacing: 4) {
+                            .font(.system(size: 12, weight: .semibold))
+                        HStack(spacing: 3) {
                             Circle()
                                 .fill(confidenceColor(result.confidenceLevel))
-                                .frame(width: 6, height: 6)
+                                .frame(width: 5, height: 5)
                             Text(result.confidenceLevel.description)
-                                .font(.system(size: 11, weight: .medium))
+                                .font(.system(size: 10, weight: .medium))
                                 .foregroundColor(confidenceColor(result.confidenceLevel))
                         }
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
                     .background(
-                        RoundedRectangle(cornerRadius: 10)
+                        RoundedRectangle(cornerRadius: 8)
                             .fill(confidenceColor(result.confidenceLevel).opacity(0.1))
                             .overlay(
-                                RoundedRectangle(cornerRadius: 10)
+                                RoundedRectangle(cornerRadius: 8)
                                     .stroke(confidenceColor(result.confidenceLevel).opacity(0.3), lineWidth: 1)
                             )
                     )
@@ -327,39 +330,39 @@ struct WaveformSyncView: View {
 
             // 操作ヒント
             if syncViewModel.videoWaveform != nil && syncViewModel.audioWaveform != nil {
-                HStack(spacing: 6) {
+                HStack(spacing: 5) {
                     Image(systemName: "lightbulb.fill")
-                        .font(.system(size: 11))
+                        .font(.system(size: 10))
                         .foregroundColor(.yellow)
-                    Text("マウスホイールでズーム、Shift+ホイールまたは横スワイプでスクロール、緑の波形をドラッグしてオフセット調整")
-                        .font(.system(size: 11))
+                    Text("ホイールでズーム、Shift+ホイールでスクロール、緑の波形をドラッグで調整")
+                        .font(.system(size: 10))
                         .foregroundColor(.secondary)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
                 .background(
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: 6)
                         .fill(Color.yellow.opacity(0.08))
                 )
             }
 
             // エラー表示
             if case .error(let message) = syncViewModel.syncState {
-                HStack(spacing: 8) {
+                HStack(spacing: 6) {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 12))
+                        .font(.system(size: 11))
                         .foregroundColor(.red)
                     Text(message)
-                        .font(.system(size: 12))
+                        .font(.system(size: 11))
                         .foregroundColor(.red)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
                 .background(
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: 6)
                         .fill(Color.red.opacity(0.08))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 8)
+                            RoundedRectangle(cornerRadius: 6)
                                 .stroke(Color.red.opacity(0.3), lineWidth: 1)
                         )
                 )
