@@ -41,7 +41,7 @@ struct ContentView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
         }
-        .frame(minWidth: 950, minHeight: 520)
+        .frame(minWidth: 950, minHeight: 560)
         .background(Color(NSColor.windowBackgroundColor))
         // 自動波形表示: 両方のファイルがセットされたら自動的に波形を生成
         .onChange(of: viewModel.project.isReady) { isReady in
