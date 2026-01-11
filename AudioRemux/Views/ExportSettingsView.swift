@@ -56,6 +56,33 @@ struct ExportSettingsView: View {
                     .padding(.horizontal, 2)
             }
 
+            // ビットレート選択（AAC選択時のみ表示）
+            if settings.audioCodec.requiresBitrate {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("ビットレート")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.secondary)
+
+                    Picker("ビットレート", selection: $settings.audioBitrate) {
+                        ForEach(AudioBitrate.allCases) { bitrate in
+                            Text(bitrate.displayName).tag(bitrate)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color(NSColor.textBackgroundColor))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.secondary.opacity(0.15), lineWidth: 1)
+                            )
+                    )
+                }
+            }
+
             // 区切り線
             Rectangle()
                 .fill(Color.secondary.opacity(0.15))
