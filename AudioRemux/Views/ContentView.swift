@@ -194,6 +194,25 @@ struct ContentView: View {
                 .frame(width: 160)
             }
 
+            // ビットレート選択（AAC選択時のみ表示）
+            if viewModel.project.exportSettings.audioCodec.requiresBitrate {
+                HStack {
+                    Text("ビットレート")
+                        .font(.system(size: 13))
+                        .foregroundColor(.primary)
+
+                    Spacer()
+
+                    Picker("", selection: $viewModel.project.exportSettings.audioBitrate) {
+                        ForEach(AudioBitrate.allCases) { bitrate in
+                            Text(bitrate.displayName).tag(bitrate)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .frame(width: 120)
+                }
+            }
+
             // 自動フェード
             HStack {
                 Text("自動フェード")

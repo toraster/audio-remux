@@ -120,6 +120,11 @@ class FFmpegService {
             "-c:a", settings.audioCodec.rawValue
         ]
 
+        // ビットレート設定が必要なコーデックの場合
+        if settings.audioCodec.requiresBitrate {
+            args += ["-b:a", settings.audioBitrate.ffmpegValue]
+        }
+
         // 負のオフセット時は動画の長さを明示的に指定（-shortestだと音声が短くなった分だけ動画も短くなる）
         if settings.offsetSeconds < 0, let duration = videoDuration {
             args += ["-t", String(format: "%.3f", duration)]
