@@ -1,5 +1,54 @@
 import Foundation
 
+/// 出力コンテナフォーマットの選択肢
+enum OutputContainer: String, CaseIterable, Identifiable {
+    case mp4 = "mp4"
+    case mkv = "mkv"
+    case mov = "mov"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .mp4: return "MP4"
+        case .mkv: return "MKV"
+        case .mov: return "MOV"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .mp4: return "高い互換性、ストリーミング向き"
+        case .mkv: return "多機能、全コーデック対応"
+        case .mov: return "Apple製品向け、Final Cut Pro互換"
+        }
+    }
+
+    var fileExtension: String {
+        rawValue
+    }
+
+    /// このコンテナがサポートする音声コーデック
+    var supportedAudioCodecs: [AudioCodec] {
+        switch self {
+        case .mp4:
+            // MP4はPCMを直接サポートしない（ALACは可能）
+            return [.flac, .alac, .aac]
+        case .mkv:
+            // MKVは全てのコーデックをサポート
+            return AudioCodec.allCases
+        case .mov:
+            // MOVはApple系とPCMをサポート
+            return [.alac, .aac, .pcm16, .pcm24]
+        }
+    }
+
+    /// 指定されたコーデックがこのコンテナでサポートされているか
+    func supports(_ codec: AudioCodec) -> Bool {
+        supportedAudioCodecs.contains(codec)
+    }
+}
+
 /// 音声コーデックの選択肢
 enum AudioCodec: String, CaseIterable, Identifiable {
     case flac = "flac"
@@ -65,16 +114,30 @@ struct ExportSettings {
     var offsetSeconds: Double = 0.0
     var outputDirectory: URL?
 
+    /// 出力コンテナフォーマット
+    var outputContainer: OutputContainer = .mp4
+
+    /// 出力ファイル名サフィックス（空の場合は "_replaced"）
+    var outputSuffix: String = "_replaced"
+
     /// 自動フェード有効（ぶつ切りノイズ対策）
     var autoFadeEnabled: Bool = true
 
     /// フェード時間（秒）- 固定値10ms
     static let fadeSeconds: Double = 0.01
 
+    /// デフォルトのサフィックス
+    static let defaultSuffix: String = "_replaced"
+
+    /// 実際に使用するサフィックス（空の場合はデフォルト値を返す）
+    var effectiveSuffix: String {
+        outputSuffix.trimmingCharacters(in: .whitespaces).isEmpty ? Self.defaultSuffix : outputSuffix
+    }
+
     /// 出力ファイル名を生成
     func outputFileName(from inputURL: URL) -> String {
         let baseName = inputURL.deletingPathExtension().lastPathComponent
-        return "\(baseName)_replaced.mp4"
+        return "\(baseName)\(effectiveSuffix).\(outputContainer.fileExtension)"
     }
 
     /// 出力先URLを生成
@@ -82,5 +145,20 @@ struct ExportSettings {
         let fileName = outputFileName(from: inputURL)
         let directory = outputDirectory ?? inputURL.deletingLastPathComponent()
         return directory.appendingPathComponent(fileName)
+    }
+
+    /// 現在の設定が有効かどうか（コンテナとコーデックの互換性）
+    var isValidCombination: Bool {
+        outputContainer.supports(audioCodec)
+    }
+
+    /// コンテナ変更時に互換性のあるコーデックに自動調整
+    mutating func adjustCodecForContainer() {
+        if !outputContainer.supports(audioCodec) {
+            // 互換性のない場合は、コンテナがサポートする最初のコーデックに変更
+            if let firstSupported = outputContainer.supportedAudioCodecs.first {
+                audioCodec = firstSupported
+            }
+        }
     }
 }

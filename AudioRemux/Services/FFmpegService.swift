@@ -6,6 +6,7 @@ enum FFmpegError: LocalizedError {
     case executionFailed(String)
     case invalidOutput
     case timeout(TimeInterval)
+    case incompatibleFormat(container: String, codec: String)
 
     var errorDescription: String? {
         switch self {
@@ -17,6 +18,8 @@ enum FFmpegError: LocalizedError {
             return "無効な出力です"
         case .timeout(let seconds):
             return "処理がタイムアウトしました（\(Int(seconds))秒）"
+        case .incompatibleFormat(let container, let codec):
+            return "\(container)コンテナは\(codec)コーデックをサポートしていません"
         }
     }
 }
@@ -184,6 +187,14 @@ class FFmpegService {
         }
         guard FileManager.default.fileExists(atPath: audioURL.path) else {
             throw FFmpegError.executionFailed("音声ファイルが見つかりません: \(audioURL.lastPathComponent)")
+        }
+
+        // コンテナとコーデックの互換性チェック
+        guard settings.outputContainer.supports(settings.audioCodec) else {
+            throw FFmpegError.incompatibleFormat(
+                container: settings.outputContainer.displayName,
+                codec: settings.audioCodec.displayName
+            )
         }
 
         // 動画の長さを取得（フェード適用および負のオフセット時の出力長制御に使用）

@@ -26,6 +26,28 @@ struct ExportSettingsView: View {
                     .font(.system(size: 14, weight: .bold))
             }
 
+            // 出力フォーマット選択
+            VStack(alignment: .leading, spacing: 6) {
+                Text("出力フォーマット")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.secondary)
+
+                Picker("フォーマット", selection: $settings.outputContainer) {
+                    ForEach(OutputContainer.allCases) { container in
+                        Text(container.displayName).tag(container)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: settings.outputContainer) { _ in
+                    settings.adjustCodecForContainer()
+                }
+
+                Text(settings.outputContainer.description)
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 2)
+            }
+
             // 音声コーデック選択
             VStack(alignment: .leading, spacing: 6) {
                 Text("音声コーデック")
@@ -33,7 +55,7 @@ struct ExportSettingsView: View {
                     .foregroundColor(.secondary)
 
                 Picker("コーデック", selection: $settings.audioCodec) {
-                    ForEach(AudioCodec.allCases) { codec in
+                    ForEach(settings.outputContainer.supportedAudioCodecs) { codec in
                         Text(codec.displayName).tag(codec)
                     }
                 }
@@ -81,6 +103,32 @@ struct ExportSettingsView: View {
                             )
                     )
                 }
+            }
+
+            // ファイル名サフィックス設定
+            VStack(alignment: .leading, spacing: 6) {
+                Text("ファイル名サフィックス")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.secondary)
+
+                TextField("_replaced", text: $settings.outputSuffix)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13, design: .monospaced))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color(NSColor.textBackgroundColor))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.secondary.opacity(0.15), lineWidth: 1)
+                            )
+                    )
+
+                Text("出力例: input\(settings.effectiveSuffix).\(settings.outputContainer.fileExtension)")
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 2)
             }
 
             // 区切り線
