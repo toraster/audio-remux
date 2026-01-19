@@ -74,16 +74,26 @@ struct WaveformSyncView: View {
         .onChange(of: offsetSeconds) { newValue in
             playbackService.offsetSeconds = newValue
         }
-        // 再生位置が変更されたらカーソル位置を更新
+        // 再生位置が変更されたらカーソル位置を更新（停止時も含む）
         .onChange(of: playbackService.currentTime) { time in
-            if playbackService.isPlaying {
-                cursorPosition = time
-            }
+            cursorPosition = time
         }
-        // カーソル位置が変更されたら再生位置を更新（再生中でない場合）
+        // カーソル位置が変更されたら再生位置を更新（再生中でない場合）、または自動スクロール（再生中）
         .onChange(of: cursorPosition) { position in
-            if let position = position, !playbackService.isPlaying {
-                playbackService.seek(to: position)
+            if let position = position {
+                if playbackService.isPlaying {
+                    // 再生中: カーソルが画面外に出たら自動スクロール
+                    let visibleDuration = maxDuration / zoomLevel
+                    let visibleEnd = scrollPosition + visibleDuration
+
+                    if position < scrollPosition || position > visibleEnd {
+                        // カーソルを画面の左端に配置するようスクロール
+                        let newScrollPosition = position
+                        scrollPosition = max(0, min(maxScrollPosition, newScrollPosition))
+                    }
+                } else {
+                    playbackService.seek(to: position)
+                }
             }
         }
         .onDisappear {

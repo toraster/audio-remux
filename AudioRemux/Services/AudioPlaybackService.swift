@@ -28,6 +28,12 @@ class AudioPlaybackService: ObservableObject {
     private var displayLink: CVDisplayLink?
     private var timer: Timer?
 
+    /// 再生開始位置（停止1回目で戻る位置）
+    private var playbackStartPosition: TimeInterval = 0
+
+    /// 既に再生開始位置にいるか（2回目停止判定用）
+    private var isAtPlaybackStart: Bool = false
+
     /// オフセット（秒）：正の値は置換音声を遅らせる
     var offsetSeconds: Double = 0
 
@@ -88,10 +94,14 @@ class AudioPlaybackService: ObservableObject {
 
     /// 指定位置から再生開始
     func play(from time: TimeInterval) {
-        stop()
+        stopPlayback()
 
         let startTime = max(0, time)
         currentTime = startTime
+
+        // 新規再生開始時のみ playbackStartPosition を記録
+        playbackStartPosition = startTime
+        isAtPlaybackStart = false
 
         switch playbackMode {
         case .original:
@@ -114,19 +124,38 @@ class AudioPlaybackService: ObservableObject {
         stopTimer()
     }
 
-    /// 停止（先頭に戻る）
-    func stop() {
+    /// 内部用: プレイヤーのみ停止（currentTimeは変更しない）
+    private func stopPlayback() {
         originalPlayer?.stop()
         replacementPlayer?.stop()
         isPlaying = false
         stopTimer()
     }
 
+    /// 停止（2段階動作：1回目は再生開始位置、2回目は先頭へ）
+    func stop() {
+        stopPlayback()
+
+        if isAtPlaybackStart || currentTime == playbackStartPosition {
+            // 2回目または既に開始位置 → 先頭へ
+            currentTime = 0
+            playbackStartPosition = 0
+            isAtPlaybackStart = false
+        } else {
+            // 1回目 → 再生開始位置へ
+            currentTime = playbackStartPosition
+            isAtPlaybackStart = true
+        }
+    }
+
     /// シーク
     func seek(to time: TimeInterval) {
         let wasPlaying = isPlaying
-        stop()
+        stopPlayback()
         currentTime = max(0, min(time, duration))
+
+        // シーク時はフラグをリセット
+        isAtPlaybackStart = false
 
         if wasPlaying {
             play(from: currentTime)
@@ -283,6 +312,8 @@ class AudioPlaybackService: ObservableObject {
         replacementAudioURL = nil
         currentTime = 0
         duration = 0
+        playbackStartPosition = 0
+        isAtPlaybackStart = false
     }
 }
 
