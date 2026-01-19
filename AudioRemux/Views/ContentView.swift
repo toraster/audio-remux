@@ -177,6 +177,27 @@ struct ContentView: View {
 
     private var exportSettingsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
+            // 出力フォーマット選択
+            VStack(alignment: .leading, spacing: 6) {
+                Text("出力フォーマット")
+                    .font(.system(size: 13))
+                    .foregroundColor(.primary)
+
+                Picker("", selection: $viewModel.project.exportSettings.outputContainer) {
+                    ForEach(OutputContainer.allCases) { container in
+                        Text(container.displayName).tag(container)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: viewModel.project.exportSettings.outputContainer) { _ in
+                    viewModel.project.exportSettings.adjustCodecForContainer()
+                }
+
+                Text(viewModel.project.exportSettings.outputContainer.description)
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+            }
+
             // コーデック選択
             HStack {
                 Text("出力コーデック")
@@ -186,7 +207,7 @@ struct ContentView: View {
                 Spacer()
 
                 Picker("", selection: $viewModel.project.exportSettings.audioCodec) {
-                    ForEach(AudioCodec.allCases) { codec in
+                    ForEach(viewModel.project.exportSettings.outputContainer.supportedAudioCodecs) { codec in
                         Text(codec.displayName).tag(codec)
                     }
                 }
@@ -211,6 +232,21 @@ struct ContentView: View {
                     .pickerStyle(.menu)
                     .frame(width: 120)
                 }
+            }
+
+            // ファイル名サフィックス
+            VStack(alignment: .leading, spacing: 4) {
+                Text("ファイル名サフィックス")
+                    .font(.system(size: 13))
+                    .foregroundColor(.primary)
+
+                TextField("_replaced", text: $viewModel.project.exportSettings.outputSuffix)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 12, design: .monospaced))
+
+                Text("出力例: input\(viewModel.project.exportSettings.effectiveSuffix).\(viewModel.project.exportSettings.outputContainer.fileExtension)")
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundColor(.secondary)
             }
 
             // 自動フェード
