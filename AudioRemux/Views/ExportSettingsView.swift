@@ -38,7 +38,7 @@ struct ExportSettingsView: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .onChange(of: settings.outputContainer) { _, _ in
+                .onChange(of: settings.outputContainer) { _ in
                     settings.adjustCodecForContainer()
                 }
 
