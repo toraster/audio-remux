@@ -9,6 +9,9 @@ struct WaveformSyncView: View {
     let onOffsetChanged: (Double) -> Void
     let onResetOffset: () -> Void
 
+    /// 音声再生サービス
+    @StateObject private var playbackService = AudioPlaybackService()
+
     /// ズームレベル（1.0 = 全体表示、200.0 = 最大ズーム）
     @State private var zoomLevel: Double = 1.0
 
@@ -37,6 +40,13 @@ struct WaveformSyncView: View {
                     )
                 )
 
+            // 再生コントロール
+            PlaybackControlView(
+                playbackService: playbackService,
+                isEnabled: syncViewModel.extractedVideoAudioURL != nil
+            )
+            .padding(.horizontal, 2)
+
             // 区切り線
             Rectangle()
                 .fill(Color.secondary.opacity(0.15))
@@ -53,6 +63,32 @@ struct WaveformSyncView: View {
                 .fill(Color(NSColor.controlBackgroundColor))
                 .shadow(color: Color.black.opacity(0.03), radius: 3, x: 0, y: 1)
         )
+        // 一時ファイルURLが変更されたら再生サービスを更新
+        .onChange(of: syncViewModel.extractedVideoAudioURL) { url in
+            playbackService.originalAudioURL = url
+        }
+        .onChange(of: syncViewModel.extractedReplacementAudioURL) { url in
+            playbackService.replacementAudioURL = url
+        }
+        // オフセットが変更されたら再生サービスに反映
+        .onChange(of: offsetSeconds) { newValue in
+            playbackService.offsetSeconds = newValue
+        }
+        // 再生位置が変更されたらカーソル位置を更新
+        .onChange(of: playbackService.currentTime) { time in
+            if playbackService.isPlaying {
+                cursorPosition = time
+            }
+        }
+        // カーソル位置が変更されたら再生位置を更新（再生中でない場合）
+        .onChange(of: cursorPosition) { position in
+            if let position = position, !playbackService.isPlaying {
+                playbackService.seek(to: position)
+            }
+        }
+        .onDisappear {
+            playbackService.cleanup()
+        }
     }
 
     // MARK: - Header
