@@ -9,6 +9,11 @@ class SyncAnalyzerViewModel: ObservableObject {
     @Published var audioWaveform: WaveformData?
     @Published var lastResult: SyncAnalysisResult?
 
+    /// 抽出した元動画の音声ファイルURL（再生用に保持）
+    @Published private(set) var extractedVideoAudioURL: URL?
+    /// 変換した置換音声ファイルURL（再生用に保持）
+    @Published private(set) var extractedReplacementAudioURL: URL?
+
     private let ffmpeg = FFmpegService.shared
     private let waveformGenerator = WaveformGenerator.shared
     private let audioAnalyzer = AudioAnalyzer.shared
@@ -49,17 +54,13 @@ class SyncAnalyzerViewModel: ObservableObject {
         Logger.debug("Video: \(videoURL.path)", category: .syncAnalyzer)
         Logger.debug("Audio: \(audioURL.path)", category: .syncAnalyzer)
 
+        // 以前の一時ファイルを削除
+        cleanupTempFiles()
+
         // 一時ファイルのパス（関数スコープで保持）
         let tempDir = FileManager.default.temporaryDirectory
         let videoAudioURL = tempDir.appendingPathComponent("video_audio_\(UUID().uuidString).wav")
         let audioWavURL = tempDir.appendingPathComponent("audio_\(UUID().uuidString).wav")
-
-        // 最終的に一時ファイルを削除
-        defer {
-            try? FileManager.default.removeItem(at: videoAudioURL)
-            try? FileManager.default.removeItem(at: audioWavURL)
-            Logger.debug("Cleaned up temp files", category: .syncAnalyzer)
-        }
 
         do {
             // 動画から音声を抽出
@@ -83,15 +84,26 @@ class SyncAnalyzerViewModel: ObservableObject {
 
             videoWaveform = videoWf
             audioWaveform = audioWf
+
+            // 再生用に一時ファイルURLを保持
+            extractedVideoAudioURL = videoAudioURL
+            extractedReplacementAudioURL = audioWavURL
+
             syncState = .idle
             Logger.info("Waveform generation completed successfully", category: .syncAnalyzer)
             return true
 
         } catch is CancellationError {
+            // エラー時は一時ファイルを削除
+            try? FileManager.default.removeItem(at: videoAudioURL)
+            try? FileManager.default.removeItem(at: audioWavURL)
             Logger.debug("Operation was cancelled", category: .syncAnalyzer)
             syncState = .error("処理がキャンセルされました")
             return false
         } catch {
+            // エラー時は一時ファイルを削除
+            try? FileManager.default.removeItem(at: videoAudioURL)
+            try? FileManager.default.removeItem(at: audioWavURL)
             Logger.error("Error: \(error.localizedDescription)", category: .syncAnalyzer)
             syncState = .error(error.localizedDescription)
             return false
@@ -141,9 +153,26 @@ class SyncAnalyzerViewModel: ObservableObject {
         currentTask?.cancel()
         currentTask = nil
 
+        // 一時ファイルを削除
+        cleanupTempFiles()
+
         syncState = .idle
         videoWaveform = nil
         audioWaveform = nil
         lastResult = nil
+    }
+
+    /// 一時ファイルを削除
+    private func cleanupTempFiles() {
+        if let url = extractedVideoAudioURL {
+            try? FileManager.default.removeItem(at: url)
+            extractedVideoAudioURL = nil
+            Logger.debug("Cleaned up video audio temp file", category: .syncAnalyzer)
+        }
+        if let url = extractedReplacementAudioURL {
+            try? FileManager.default.removeItem(at: url)
+            extractedReplacementAudioURL = nil
+            Logger.debug("Cleaned up replacement audio temp file", category: .syncAnalyzer)
+        }
     }
 }

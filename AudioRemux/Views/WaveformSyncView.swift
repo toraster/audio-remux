@@ -9,6 +9,9 @@ struct WaveformSyncView: View {
     let onOffsetChanged: (Double) -> Void
     let onResetOffset: () -> Void
 
+    /// 音声再生サービス
+    @StateObject private var playbackService = AudioPlaybackService()
+
     /// ズームレベル（1.0 = 全体表示、200.0 = 最大ズーム）
     @State private var zoomLevel: Double = 1.0
 
@@ -30,12 +33,20 @@ struct WaveformSyncView: View {
             // 波形表示エリア
             waveformSection
                 .background(
-                    // キーボードナビゲーション（Home/Endキー対応、フォーカス不要）
+                    // キーボードナビゲーション（Home/End/Spaceキー対応、フォーカス不要）
                     KeyboardNavigationView(
                         onHome: { scrollPosition = 0 },
-                        onEnd: { scrollPosition = maxScrollPosition }
+                        onEnd: { scrollPosition = maxScrollPosition },
+                        onSpace: { playbackService.togglePlayPause() }
                     )
                 )
+
+            // 再生コントロール
+            PlaybackControlView(
+                playbackService: playbackService,
+                isEnabled: syncViewModel.extractedVideoAudioURL != nil
+            )
+            .padding(.horizontal, 2)
 
             // 区切り線
             Rectangle()
@@ -53,6 +64,42 @@ struct WaveformSyncView: View {
                 .fill(Color(NSColor.controlBackgroundColor))
                 .shadow(color: Color.black.opacity(0.03), radius: 3, x: 0, y: 1)
         )
+        // 一時ファイルURLが変更されたら再生サービスを更新
+        .onChange(of: syncViewModel.extractedVideoAudioURL) { url in
+            playbackService.originalAudioURL = url
+        }
+        .onChange(of: syncViewModel.extractedReplacementAudioURL) { url in
+            playbackService.replacementAudioURL = url
+        }
+        // オフセットが変更されたら再生サービスに反映
+        .onChange(of: offsetSeconds) { newValue in
+            playbackService.offsetSeconds = newValue
+        }
+        // 再生位置が変更されたらカーソル位置を更新（停止時も含む）
+        .onChange(of: playbackService.currentTime) { time in
+            cursorPosition = time
+        }
+        // カーソル位置が変更されたら再生位置を更新（再生中でない場合）、または自動スクロール（再生中）
+        .onChange(of: cursorPosition) { position in
+            if let position = position {
+                if playbackService.isPlaying {
+                    // 再生中: カーソルが画面外に出たら自動スクロール
+                    let visibleDuration = maxDuration / zoomLevel
+                    let visibleEnd = scrollPosition + visibleDuration
+
+                    if position < scrollPosition || position > visibleEnd {
+                        // カーソルを画面の左端に配置するようスクロール
+                        let newScrollPosition = position
+                        scrollPosition = max(0, min(maxScrollPosition, newScrollPosition))
+                    }
+                } else {
+                    playbackService.seek(to: position)
+                }
+            }
+        }
+        .onDisappear {
+            playbackService.cleanup()
+        }
     }
 
     // MARK: - Header

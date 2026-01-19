@@ -1,16 +1,23 @@
 import SwiftUI
 
-/// キーボードナビゲーション用のビュー（Home/Endキー対応）
+/// キーボードナビゲーション用のビュー（Home/End/Spaceキー対応）
 /// フォーカスに関係なくキーイベントを検出
 struct KeyboardNavigationView: View {
     let onHome: () -> Void
     let onEnd: () -> Void
+    let onSpace: (() -> Void)?
+
+    init(onHome: @escaping () -> Void, onEnd: @escaping () -> Void, onSpace: (() -> Void)? = nil) {
+        self.onHome = onHome
+        self.onEnd = onEnd
+        self.onSpace = onSpace
+    }
 
     var body: some View {
         Color.clear
             .frame(width: 0, height: 0)
             .onAppear {
-                KeyboardMonitor.shared.register(onHome: onHome, onEnd: onEnd)
+                KeyboardMonitor.shared.register(onHome: onHome, onEnd: onEnd, onSpace: onSpace)
             }
             .onDisappear {
                 KeyboardMonitor.shared.unregister()
@@ -25,12 +32,14 @@ class KeyboardMonitor {
     private var monitor: Any?
     private var onHome: (() -> Void)?
     private var onEnd: (() -> Void)?
+    private var onSpace: (() -> Void)?
 
     private init() {}
 
-    func register(onHome: @escaping () -> Void, onEnd: @escaping () -> Void) {
+    func register(onHome: @escaping () -> Void, onEnd: @escaping () -> Void, onSpace: (() -> Void)? = nil) {
         self.onHome = onHome
         self.onEnd = onEnd
+        self.onSpace = onSpace
 
         // 既存のモニターがあれば削除
         if let monitor = monitor {
@@ -42,6 +51,12 @@ class KeyboardMonitor {
             guard let self = self else { return event }
 
             switch event.keyCode {
+            case 49: // Space key
+                if let onSpace = self.onSpace {
+                    onSpace()
+                    return nil // イベントを消費
+                }
+                return event
             case 115: // Home key
                 self.onHome?()
                 return nil // イベントを消費
@@ -61,5 +76,6 @@ class KeyboardMonitor {
         }
         onHome = nil
         onEnd = nil
+        onSpace = nil
     }
 }
