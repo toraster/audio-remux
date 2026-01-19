@@ -33,10 +33,11 @@ struct WaveformSyncView: View {
             // 波形表示エリア
             waveformSection
                 .background(
-                    // キーボードナビゲーション（Home/Endキー対応、フォーカス不要）
+                    // キーボードナビゲーション（Home/End/Spaceキー対応、フォーカス不要）
                     KeyboardNavigationView(
                         onHome: { scrollPosition = 0 },
-                        onEnd: { scrollPosition = maxScrollPosition }
+                        onEnd: { scrollPosition = maxScrollPosition },
+                        onSpace: { playbackService.togglePlayPause() }
                     )
                 )
 
