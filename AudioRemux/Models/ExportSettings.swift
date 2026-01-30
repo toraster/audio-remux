@@ -1,5 +1,14 @@
 import Foundation
 
+/// ビット深度の選択肢
+enum BitDepth: Int, CaseIterable, Identifiable {
+    case bit16 = 16
+    case bit24 = 24
+
+    var id: Int { rawValue }
+    var displayName: String { "\(rawValue)bit" }
+}
+
 /// 出力コンテナフォーマットの選択肢
 enum OutputContainer: String, CaseIterable, Identifiable {
     case mp4 = "mp4"
@@ -39,13 +48,23 @@ enum OutputContainer: String, CaseIterable, Identifiable {
             return AudioCodec.allCases
         case .mov:
             // MOVはApple系とPCMをサポート
-            return [.alac, .aac, .pcm16, .pcm24]
+            return [.alac, .aac, .pcm]
         }
     }
 
     /// 指定されたコーデックがこのコンテナでサポートされているか
     func supports(_ codec: AudioCodec) -> Bool {
         supportedAudioCodecs.contains(codec)
+    }
+
+    /// コンテナとコーデックの組み合わせに関する警告メッセージ
+    func warning(for codec: AudioCodec) -> String? {
+        switch (self, codec) {
+        case (.mp4, .flac):
+            return "MP4+FLACは一部のプレイヤーで再生できません"
+        default:
+            return nil
+        }
     }
 }
 
@@ -54,8 +73,7 @@ enum AudioCodec: String, CaseIterable, Identifiable {
     case flac = "flac"
     case alac = "alac"
     case aac = "aac"
-    case pcm16 = "pcm_s16le"
-    case pcm24 = "pcm_s24le"
+    case pcm = "pcm"
 
     var id: String { rawValue }
 
@@ -64,8 +82,7 @@ enum AudioCodec: String, CaseIterable, Identifiable {
         case .flac: return "FLAC (推奨)"
         case .alac: return "ALAC (Apple Lossless)"
         case .aac: return "AAC"
-        case .pcm16: return "PCM 16bit"
-        case .pcm24: return "PCM 24bit"
+        case .pcm: return "PCM"
         }
     }
 
@@ -74,8 +91,7 @@ enum AudioCodec: String, CaseIterable, Identifiable {
         case .flac: return "可逆圧縮、ファイルサイズ削減"
         case .alac: return "Apple Lossless、Appleエコシステム向け"
         case .aac: return "非可逆圧縮、高い互換性"
-        case .pcm16: return "非圧縮、最大互換性"
-        case .pcm24: return "非圧縮、高音質"
+        case .pcm: return "非圧縮、最大互換性"
         }
     }
 
@@ -84,6 +100,31 @@ enum AudioCodec: String, CaseIterable, Identifiable {
         switch self {
         case .aac: return true
         default: return false
+        }
+    }
+
+    /// ビット深度設定が有効なコーデックかどうか
+    var supportsBitDepth: Bool {
+        switch self {
+        case .flac, .alac, .pcm: return true
+        case .aac: return false
+        }
+    }
+
+    /// FFmpegに渡すコーデック名を取得
+    func ffmpegCodecName(bitDepth: BitDepth) -> String {
+        switch self {
+        case .flac:
+            return "flac"
+        case .alac:
+            return "alac"
+        case .aac:
+            return "aac"
+        case .pcm:
+            switch bitDepth {
+            case .bit16: return "pcm_s16le"
+            case .bit24: return "pcm_s24le"
+            }
         }
     }
 }
@@ -110,6 +151,7 @@ enum AudioBitrate: Int, CaseIterable, Identifiable {
 /// エクスポート設定
 struct ExportSettings {
     var audioCodec: AudioCodec = .flac
+    var audioBitDepth: BitDepth = .bit24
     var audioBitrate: AudioBitrate = .kbps256
     var offsetSeconds: Double = 0.0
     var outputDirectory: URL?

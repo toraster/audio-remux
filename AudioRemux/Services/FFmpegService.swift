@@ -116,12 +116,26 @@ class FFmpegService {
         }
 
         // ストリームマッピングとコーデック設定
+        let codecName = settings.audioCodec.ffmpegCodecName(bitDepth: settings.audioBitDepth)
         args += [
             "-map", "0:v",
             "-map", "1:a",
             "-c:v", "copy",
-            "-c:a", settings.audioCodec.rawValue
+            "-c:a", codecName
         ]
+
+        // ビット深度設定（FLAC/ALACの場合）
+        if settings.audioCodec.supportsBitDepth && settings.audioCodec != .pcm {
+            let sampleFmt: String
+            switch (settings.audioCodec, settings.audioBitDepth) {
+            case (.flac, .bit16): sampleFmt = "s16"
+            case (.flac, .bit24): sampleFmt = "s32"
+            case (.alac, .bit16): sampleFmt = "s16p"
+            case (.alac, .bit24): sampleFmt = "s32p"
+            default: sampleFmt = "s32"
+            }
+            args += ["-sample_fmt", sampleFmt]
+        }
 
         // ビットレート設定が必要なコーデックの場合
         if settings.audioCodec.requiresBitrate {
