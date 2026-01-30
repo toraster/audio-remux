@@ -208,7 +208,10 @@ struct ContentView: View {
 
                 Picker("", selection: $viewModel.project.exportSettings.audioCodec) {
                     ForEach(viewModel.project.exportSettings.outputContainer.supportedAudioCodecs) { codec in
-                        Text(codec.displayName).tag(codec)
+                        Text(codec == viewModel.project.exportSettings.outputContainer.recommendedCodec
+                             ? "\(codec.displayName) (推奨)"
+                             : codec.displayName)
+                            .tag(codec)
                     }
                 }
                 .pickerStyle(.menu)

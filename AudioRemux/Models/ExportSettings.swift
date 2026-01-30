@@ -57,6 +57,15 @@ enum OutputContainer: String, CaseIterable, Identifiable {
         supportedAudioCodecs.contains(codec)
     }
 
+    /// このコンテナで推奨される音声コーデック
+    var recommendedCodec: AudioCodec {
+        switch self {
+        case .mp4: return .alac   // MP4ではALACを推奨（互換性重視）
+        case .mkv: return .flac   // MKVではFLACを推奨（可逆圧縮）
+        case .mov: return .alac   // MOVではALACを推奨（Apple互換）
+        }
+    }
+
     /// コンテナとコーデックの組み合わせに関する警告メッセージ
     func warning(for codec: AudioCodec) -> String? {
         switch (self, codec) {
@@ -79,8 +88,8 @@ enum AudioCodec: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .flac: return "FLAC (推奨)"
-        case .alac: return "ALAC (Apple Lossless)"
+        case .flac: return "FLAC"
+        case .alac: return "ALAC"
         case .aac: return "AAC"
         case .pcm: return "PCM"
         }
