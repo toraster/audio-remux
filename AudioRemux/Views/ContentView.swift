@@ -208,11 +208,33 @@ struct ContentView: View {
 
                 Picker("", selection: $viewModel.project.exportSettings.audioCodec) {
                     ForEach(viewModel.project.exportSettings.outputContainer.supportedAudioCodecs) { codec in
-                        Text(codec.displayName).tag(codec)
+                        Text(codec == viewModel.project.exportSettings.outputContainer.recommendedCodec
+                             ? "\(codec.displayName) (推奨)"
+                             : codec.displayName)
+                            .tag(codec)
                     }
                 }
                 .pickerStyle(.menu)
                 .frame(width: 160)
+            }
+
+            // ビット深度選択（FLAC/ALAC/PCM選択時のみ表示）
+            if viewModel.project.exportSettings.audioCodec.supportsBitDepth {
+                HStack {
+                    Text("ビット深度")
+                        .font(.system(size: 13))
+                        .foregroundColor(.primary)
+
+                    Spacer()
+
+                    Picker("", selection: $viewModel.project.exportSettings.audioBitDepth) {
+                        ForEach(BitDepth.allCases) { depth in
+                            Text(depth.displayName).tag(depth)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .frame(width: 120)
+                }
             }
 
             // ビットレート選択（AAC選択時のみ表示）
@@ -231,6 +253,18 @@ struct ContentView: View {
                     }
                     .pickerStyle(.menu)
                     .frame(width: 120)
+                }
+            }
+
+            // コーデック互換性警告
+            if let warning = viewModel.project.exportSettings.outputContainer.warning(for: viewModel.project.exportSettings.audioCodec) {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(.orange)
+                    Text(warning)
+                        .font(.system(size: 11))
+                        .foregroundColor(.orange)
                 }
             }
 
