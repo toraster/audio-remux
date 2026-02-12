@@ -249,7 +249,7 @@ struct VideoDropZone: View {
         FileDropZone(
             title: "動画ファイル",
             icon: "film.circle.fill",
-            acceptedTypes: [.mpeg4Movie, .quickTimeMovie],
+            acceptedTypes: [.mpeg4Movie, .quickTimeMovie, UTType("com.apple.m4v-video")!],
             file: file,
             onDrop: onDrop
         )
@@ -265,7 +265,7 @@ struct AudioDropZone: View {
         FileDropZone(
             title: "音声ファイル",
             icon: "waveform.circle.fill",
-            acceptedTypes: [.wav, .aiff],
+            acceptedTypes: [.wav, .aiff, UTType(filenameExtension: "flac")!],
             file: file,
             onDrop: onDrop
         )
