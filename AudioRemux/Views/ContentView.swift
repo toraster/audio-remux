@@ -167,7 +167,7 @@ struct ContentView: View {
                 .padding(.horizontal, 14)
 
             // エクスポート設定（スクロール可能、残りスペースを占有）
-            ScrollView(.vertical, showsIndicators: false) {
+            ScrollView(.vertical, showsIndicators: showAdvancedSettings) {
                 exportSettingsSection
                     .padding(14)
             }
