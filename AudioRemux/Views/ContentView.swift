@@ -9,6 +9,9 @@ struct ContentView: View {
     @State private var showReplaceConfirmation = false
     @State private var pendingFileAction: (() -> Void)?
 
+    /// 詳細設定の折りたたみ状態
+    @State private var showAdvancedSettings = false
+
     /// 左カラムの幅
     private let leftColumnWidth: CGFloat = 300
 
@@ -268,32 +271,42 @@ struct ContentView: View {
                 }
             }
 
-            // ファイル名サフィックス
-            VStack(alignment: .leading, spacing: 4) {
-                Text("ファイル名サフィックス")
-                    .font(.system(size: 13))
-                    .foregroundColor(.primary)
+            // 詳細設定（折りたたみ可能）
+            DisclosureGroup(isExpanded: $showAdvancedSettings) {
+                VStack(alignment: .leading, spacing: 12) {
+                    // ファイル名サフィックス
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("ファイル名サフィックス")
+                            .font(.system(size: 13))
+                            .foregroundColor(.primary)
 
-                TextField("_replaced", text: $viewModel.project.exportSettings.outputSuffix)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.system(size: 12, design: .monospaced))
+                        TextField("_replaced", text: $viewModel.project.exportSettings.outputSuffix)
+                            .textFieldStyle(.roundedBorder)
+                            .font(.system(size: 12, design: .monospaced))
 
-                Text("出力例: input\(viewModel.project.exportSettings.effectiveSuffix).\(viewModel.project.exportSettings.outputContainer.fileExtension)")
-                    .font(.system(size: 11, design: .monospaced))
+                        Text("出力例: input\(viewModel.project.exportSettings.effectiveSuffix).\(viewModel.project.exportSettings.outputContainer.fileExtension)")
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundColor(.secondary)
+                    }
+
+                    // 自動フェード
+                    HStack {
+                        Text("自動フェード")
+                            .font(.system(size: 13))
+
+                        Spacer()
+
+                        Toggle("", isOn: $viewModel.project.exportSettings.autoFadeEnabled)
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
+                            .labelsHidden()
+                    }
+                }
+                .padding(.top, 8)
+            } label: {
+                Text("詳細設定")
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.secondary)
-            }
-
-            // 自動フェード
-            HStack {
-                Text("自動フェード")
-                    .font(.system(size: 13))
-
-                Spacer()
-
-                Toggle("", isOn: $viewModel.project.exportSettings.autoFadeEnabled)
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .labelsHidden()
             }
         }
     }
@@ -448,24 +461,38 @@ struct ContentView: View {
                 .font(.system(size: 12))
 
             default:
-                if viewModel.project.isReady {
-                    Image(systemName: "checkmark.circle")
-                        .foregroundColor(.green)
-                        .font(.system(size: 12))
-                    Text("エクスポート準備完了")
-                        .font(.system(size: 12))
-                        .foregroundColor(.secondary)
-                } else {
-                    Image(systemName: "info.circle")
-                        .foregroundColor(.secondary)
-                        .font(.system(size: 12))
-                    Text("動画と音声ファイルを選択してください")
-                        .font(.system(size: 12))
-                        .foregroundColor(.secondary)
-                }
+                stepGuideStatusView
             }
 
             Spacer()
+        }
+    }
+
+    @ViewBuilder
+    private var stepGuideStatusView: some View {
+        let guide = currentStepGuide
+        Image(systemName: guide.icon)
+            .foregroundColor(guide.color)
+            .font(.system(size: 12))
+        Text(guide.message)
+            .font(.system(size: 12))
+            .foregroundColor(.secondary)
+    }
+
+    private var currentStepGuide: (icon: String, color: Color, message: String) {
+        let hasVideo = viewModel.project.videoFile != nil
+        let hasAudio = viewModel.project.audioFile != nil
+
+        if syncViewModel.syncState.isProcessing {
+            return ("waveform", .accentColor, "波形を生成中...")
+        } else if hasVideo && hasAudio && syncViewModel.videoWaveform != nil {
+            return ("checkmark.circle", .green, "自動同期を試すか、波形をドラッグして調整してエクスポートしてください")
+        } else if hasVideo && !hasAudio {
+            return ("arrow.down.circle", .accentColor, "次に音声ファイルをドロップしてください")
+        } else if !hasVideo && hasAudio {
+            return ("arrow.down.circle", .accentColor, "次に動画ファイルをドロップしてください")
+        } else {
+            return ("arrow.down.circle", .secondary, "動画と音声ファイルをドロップしてください")
         }
     }
 
