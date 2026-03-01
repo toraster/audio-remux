@@ -17,10 +17,11 @@ struct ContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // ヘッダー
+            // ヘッダー（高さ固定）
             headerView
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
+                .fixedSize(horizontal: false, vertical: true)
 
             Divider()
 
@@ -40,10 +41,11 @@ struct ContentView: View {
 
             Divider()
 
-            // ステータスバー
+            // ステータスバー（高さ固定）
             statusBar
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(minWidth: 950, minHeight: 650)
         .background(Color(NSColor.windowBackgroundColor))
@@ -164,13 +166,14 @@ struct ContentView: View {
             Divider()
                 .padding(.horizontal, 14)
 
-            // エクスポート設定
-            exportSettingsSection
-                .padding(14)
+            // エクスポート設定（スクロール可能、残りスペースを占有）
+            ScrollView(.vertical, showsIndicators: false) {
+                exportSettingsSection
+                    .padding(14)
+            }
+            .frame(maxHeight: .infinity)
 
-            Spacer()
-
-            // アクションボタン（下揃え）
+            // アクションボタン（常に下部に固定）
             actionButtonsSection
                 .padding(14)
         }
