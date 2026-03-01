@@ -88,9 +88,7 @@ struct WaveformSyncView: View {
                     let visibleEnd = scrollPosition + visibleDuration
 
                     if position < scrollPosition || position > visibleEnd {
-                        // カーソルを画面の左端に配置するようスクロール
-                        let newScrollPosition = position
-                        scrollPosition = max(0, min(maxScrollPosition, newScrollPosition))
+                        scrollPosition = max(0, min(maxScrollPosition, position))
                     }
                 } else {
                     playbackService.seek(to: position)
@@ -277,7 +275,7 @@ struct WaveformSyncView: View {
             ZoomableWaveformView(
                 waveform: syncViewModel.audioWaveform,
                 color: .green,
-                label: "置換音声（ドラッグで調整可能）",
+                label: "置換音声 ← ドラッグして同期調整",
                 duration: maxDuration,
                 zoomLevel: $zoomLevel,
                 scrollPosition: $scrollPosition,
@@ -400,19 +398,56 @@ struct WaveformSyncView: View {
 
             // 操作ヒント
             if syncViewModel.videoWaveform != nil && syncViewModel.audioWaveform != nil {
-                HStack(spacing: 5) {
+                HStack(alignment: .top, spacing: 5) {
                     Image(systemName: "lightbulb.fill")
                         .font(.system(size: 10))
                         .foregroundColor(.yellow)
-                    Text("ホイールでズーム、Shift+ホイールでスクロール、Home/Endで先頭/末尾、緑の波形をドラッグで調整")
-                        .font(.system(size: 10))
-                        .foregroundColor(.secondary)
+                        .padding(.top, 1)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("緑の波形をドラッグして同期位置を調整")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.secondary)
+                        Text("ホイール: ズーム  /  Shift+ホイール: スクロール  /  Home/End: 先頭/末尾")
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary.opacity(0.8))
+                    }
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .background(
                     RoundedRectangle(cornerRadius: 6)
                         .fill(Color.yellow.opacity(0.08))
+                )
+            }
+
+            // 低信頼度時の手動調整ガイダンス
+            if let result = syncViewModel.lastResult, result.confidenceLevel == .low {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 5) {
+                        Image(systemName: "hand.point.right.fill")
+                            .font(.system(size: 11))
+                            .foregroundColor(.orange)
+                        Text("手動調整の手順:")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(.orange)
+                    }
+                    VStack(alignment: .leading, spacing: 3) {
+                        Label("緑の波形をドラッグして元動画と位置を合わせる", systemImage: "1.circle.fill")
+                        Label("下のオフセットボタンで微調整する", systemImage: "2.circle.fill")
+                        Label("再生ボタンで確認する", systemImage: "3.circle.fill")
+                    }
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.orange.opacity(0.08))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(Color.orange.opacity(0.25), lineWidth: 1)
+                        )
                 )
             }
 
@@ -442,12 +477,9 @@ struct WaveformSyncView: View {
 
     private func confidenceColor(_ level: SyncAnalysisResult.ConfidenceLevel) -> Color {
         switch level {
-        case .high:
-            return .green
-        case .medium:
-            return .orange
-        case .low:
-            return .red
+        case .high: .green
+        case .medium: .orange
+        case .low: .red
         }
     }
 

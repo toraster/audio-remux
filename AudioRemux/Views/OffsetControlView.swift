@@ -12,9 +12,14 @@ struct OffsetControlView: View {
     var body: some View {
         HStack(spacing: 14) {
             // ラベル
-            Text("オフセット:")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(.secondary)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("オフセット調整")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.primary)
+                Text("ここで微調整できます")
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
+            }
 
             // オフセット値表示（ドラッグで調整可能）
             HStack(spacing: 2) {
