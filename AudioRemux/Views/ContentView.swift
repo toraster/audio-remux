@@ -36,6 +36,7 @@ struct ContentView: View {
                 rightColumn
                     .frame(maxWidth: .infinity)
             }
+            .frame(maxHeight: .infinity)
 
             Divider()
 
@@ -488,9 +489,9 @@ struct ContentView: View {
         } else if hasVideo && hasAudio && syncViewModel.videoWaveform != nil {
             return ("checkmark.circle", .green, "自動同期を試すか、波形をドラッグして調整してエクスポートしてください")
         } else if hasVideo && !hasAudio {
-            return ("arrow.down.circle", .accentColor, "次に音声ファイルをドロップしてください")
+            return ("arrow.down.circle", .accentColor, "音声ファイルをドロップしてください")
         } else if !hasVideo && hasAudio {
-            return ("arrow.down.circle", .accentColor, "次に動画ファイルをドロップしてください")
+            return ("arrow.down.circle", .accentColor, "動画ファイルをドロップしてください")
         } else {
             return ("arrow.down.circle", .secondary, "動画と音声ファイルをドロップしてください")
         }
