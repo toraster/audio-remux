@@ -28,6 +28,13 @@ enum FFmpegError: LocalizedError {
 class FFmpegService {
     static let shared = FFmpegService()
 
+    /// エクスポート用タイムアウト設定
+    private static let exportMinimumTimeout: TimeInterval = 300
+    private static let exportFallbackTimeout: TimeInterval = 3600
+    private static let exportMaximumTimeout: TimeInterval = 14400
+    private static let exportRealtimeMultiplier = 1.5
+    private static let exportConservativeThroughputBytesPerSecond = 25.0 * 1024 * 1024
+
     private init() {}
 
     /// FFmpegバイナリのパス
@@ -193,7 +200,10 @@ class FFmpegService {
         videoURL: URL,
         audioURL: URL,
         outputURL: URL,
-        settings: ExportSettings
+        settings: ExportSettings,
+        videoDuration: TimeInterval? = nil,
+        videoFileSize: Int64? = nil,
+        audioDuration: TimeInterval? = nil
     ) async throws {
         // ファイル存在チェック
         guard FileManager.default.fileExists(atPath: videoURL.path) else {
@@ -211,29 +221,32 @@ class FFmpegService {
             )
         }
 
-        // 動画の長さを取得（フェード適用および負のオフセット時の出力長制御に使用）
-        var videoDuration: Double?
-        if settings.offsetSeconds < 0 {
-            // 負のオフセット時は duration が必須（-shortestだと動画が短くなるため）
-            let mediaFile = try await FFprobeService.shared.getMediaInfo(url: videoURL)
-            guard let duration = mediaFile.duration else {
-                throw FFmpegError.executionFailed("動画の長さを取得できませんでした。負のオフセットを使用するには動画の長さが必要です。")
-            }
-            videoDuration = duration
-        } else if settings.autoFadeEnabled {
-            let mediaFile = try? await FFprobeService.shared.getMediaInfo(url: videoURL)
-            videoDuration = mediaFile?.duration
-        }
+        let resolvedVideoDuration = try await resolveVideoDuration(
+            videoURL: videoURL,
+            settings: settings,
+            preferredDuration: videoDuration
+        )
+        let resolvedVideoFileSize = videoFileSize ?? fileSize(for: videoURL)
+
+        let timeout = Self.calculateExportTimeout(
+            videoDuration: resolvedVideoDuration,
+            audioDuration: audioDuration,
+            videoFileSize: resolvedVideoFileSize
+        )
+        Logger.info(
+            "Using export timeout: \(Int(timeout))s (videoDuration: \(resolvedVideoDuration.map { String(format: "%.1f", $0) } ?? "nil")s, audioDuration: \(audioDuration.map { String(format: "%.1f", $0) } ?? "nil")s, videoFileSize: \(resolvedVideoFileSize.map(String.init) ?? "nil") bytes)",
+            category: .ffmpeg
+        )
 
         let arguments = buildReplaceAudioArguments(
             videoURL: videoURL,
             audioURL: audioURL,
             outputURL: outputURL,
             settings: settings,
-            videoDuration: videoDuration
+            videoDuration: resolvedVideoDuration
         )
 
-        try await execute(arguments: arguments)
+        try await execute(arguments: arguments, timeout: timeout)
     }
 
     /// 音声抽出・変換用の長いタイムアウト（5分）
@@ -296,5 +309,71 @@ class FFmpegService {
         ]
 
         try await execute(arguments: arguments, timeout: Self.audioProcessingTimeout)
+    }
+
+    private func resolveVideoDuration(
+        videoURL: URL,
+        settings: ExportSettings,
+        preferredDuration: TimeInterval?
+    ) async throws -> TimeInterval? {
+        if let preferredDuration {
+            return preferredDuration
+        }
+
+        if settings.offsetSeconds < 0 {
+            let mediaFile = try await FFprobeService.shared.getMediaInfo(url: videoURL)
+            guard let duration = mediaFile.duration else {
+                throw FFmpegError.executionFailed("動画の長さを取得できませんでした。負のオフセットを使用するには動画の長さが必要です。")
+            }
+            return duration
+        }
+
+        guard settings.autoFadeEnabled else {
+            return nil
+        }
+
+        let mediaFile = try? await FFprobeService.shared.getMediaInfo(url: videoURL)
+        return mediaFile?.duration
+    }
+
+    private func fileSize(for url: URL) -> Int64? {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path) else {
+            return nil
+        }
+        return attributes[.size] as? Int64
+    }
+
+    private static func calculateExportTimeout(
+        videoDuration: TimeInterval?,
+        audioDuration: TimeInterval?,
+        videoFileSize: Int64?
+    ) -> TimeInterval {
+        var estimates: [TimeInterval] = [exportMinimumTimeout]
+
+        if let videoFileSize, videoFileSize > 0 {
+            estimates.append(Double(videoFileSize) / exportConservativeThroughputBytesPerSecond)
+        }
+
+        let referenceDuration: TimeInterval?
+        switch (videoDuration, audioDuration) {
+        case let (videoDuration?, audioDuration?):
+            referenceDuration = max(videoDuration, audioDuration)
+        case let (videoDuration?, nil):
+            referenceDuration = videoDuration
+        case let (nil, audioDuration?):
+            referenceDuration = audioDuration
+        case (nil, nil):
+            referenceDuration = nil
+        }
+
+        if let referenceDuration, referenceDuration > 0 {
+            estimates.append(referenceDuration * exportRealtimeMultiplier)
+        }
+
+        if videoDuration == nil && audioDuration == nil {
+            estimates.append(exportFallbackTimeout)
+        }
+
+        return min(estimates.max() ?? exportMinimumTimeout, exportMaximumTimeout)
     }
 }

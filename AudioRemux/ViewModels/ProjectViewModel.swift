@@ -137,7 +137,10 @@ class ProjectViewModel: ObservableObject {
                     videoURL: videoFile.url,
                     audioURL: audioFile.url,
                     outputURL: outputURL,
-                    settings: settings
+                    settings: settings,
+                    videoDuration: videoFile.duration,
+                    videoFileSize: videoFile.fileSize,
+                    audioDuration: audioFile.duration
                 )
 
                 guard !Task.isCancelled else { return }
