@@ -1,13 +1,33 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// メインコンテンツビュー（2カラムレイアウト）
 struct ContentView: View {
+    private struct PendingWaveformRefresh {
+        let videoPath: String
+        let audioPath: String
+    }
+
+    private struct PendingDropAnimationContext {
+        let startPoint: CGPoint
+        let mediaKinds: [FileDropSupport.MediaKind]
+    }
+
     @StateObject private var viewModel = ProjectViewModel()
     @StateObject private var syncViewModel = SyncAnalyzerViewModel()
 
     /// ファイル差し替え確認ダイアログの状態
     @State private var showReplaceConfirmation = false
-    @State private var pendingFileAction: (() -> Void)?
+    @State private var pendingFileActions: [() -> Void] = []
+    @State private var pendingWaveformRefresh: PendingWaveformRefresh?
+    @State private var pendingDropAnimationContext: PendingDropAnimationContext?
+    @State private var activeDropAnimations: [ActiveDropAnimation] = []
+    @State private var isGlobalDropTargeted = false
+    @State private var isVideoDropTargeted = false
+    @State private var isAudioDropTargeted = false
+    @State private var fileDropAreaFrame: CGRect = .zero
+    @State private var videoDropZoneFrame: CGRect = .zero
+    @State private var audioDropZoneFrame: CGRect = .zero
 
     /// 詳細設定の折りたたみ状態
     @State private var showAdvancedSettings = false
@@ -48,34 +68,40 @@ struct ContentView: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(minWidth: 950, minHeight: 650)
+        .coordinateSpace(name: DropAnimationCoordinateSpace.name)
         .background(Color(NSColor.windowBackgroundColor))
-        // 自動波形表示: 両方のファイルがセットされたら自動的に波形を生成
-        .onChange(of: viewModel.project.isReady) { isReady in
-            if isReady {
-                autoGenerateWaveforms()
-            }
-        }
-        // ファイル差し替え時も波形を再生成
+        .overlay(dropOverlay)
+        .onDrop(of: FileDropSupport.allTypes, delegate: GlobalFileDropDelegate(
+            acceptedTypes: FileDropSupport.allTypes,
+            isGlobalDropTargeted: $isGlobalDropTargeted,
+            onDragChanged: updateDropTargets,
+            onDragEnded: resetDropTargets,
+            onRejectedDrop: handleRejectedDrop,
+            onPerformDrop: handleGlobalDrop
+        ))
         .onChange(of: viewModel.project.videoFile?.id) { _ in
-            if viewModel.project.isReady {
-                autoGenerateWaveforms()
-            }
+            generateWaveformsIfReady()
         }
         .onChange(of: viewModel.project.audioFile?.id) { _ in
-            if viewModel.project.isReady {
-                autoGenerateWaveforms()
+            generateWaveformsIfReady()
+        }
+        .onChange(of: viewModel.project.state) { state in
+            if case .error = state {
+                recoverPendingWaveformRefreshIfNeeded()
             }
         }
         // ファイル差し替え確認ダイアログ
         .alert("ファイルを差し替えますか？", isPresented: $showReplaceConfirmation) {
             Button("キャンセル", role: .cancel) {
-                pendingFileAction = nil
+                pendingFileActions = []
+                pendingWaveformRefresh = nil
+                pendingDropAnimationContext = nil
             }
             Button("差し替える", role: .destructive) {
-                viewModel.project.exportSettings.offsetSeconds = 0
-                syncViewModel.reset()
-                pendingFileAction?()
-                pendingFileAction = nil
+                resetSyncStateForReplacement()
+                playPendingDropAnimationsIfNeeded()
+                applyFileActions(pendingFileActions)
+                pendingFileActions = []
             }
         } message: {
             Text("現在の波形とオフセット設定がリセットされます。")
@@ -143,25 +169,22 @@ struct ContentView: View {
         VStack(spacing: 0) {
             // ファイルドロップゾーン
             VStack(spacing: 10) {
-                VideoDropZone(file: viewModel.project.videoFile) { url in
-                    if url.path.isEmpty {
-                        viewModel.clearVideoFile()
-                        syncViewModel.reset()
-                    } else {
-                        setVideoFile(url: url)
-                    }
-                }
+                VideoDropZone(
+                    file: viewModel.project.videoFile,
+                    isTargeted: isVideoDropTargeted,
+                    onDrop: handleVideoDropZoneSelection,
+                    onFrameChange: { videoDropZoneFrame = $0 }
+                )
 
-                AudioDropZone(file: viewModel.project.audioFile) { url in
-                    if url.path.isEmpty {
-                        viewModel.clearAudioFile()
-                        syncViewModel.reset()
-                    } else {
-                        setAudioFile(url: url)
-                    }
-                }
+                AudioDropZone(
+                    file: viewModel.project.audioFile,
+                    isTargeted: isAudioDropTargeted,
+                    onDrop: handleAudioDropZoneSelection,
+                    onFrameChange: { audioDropZoneFrame = $0 }
+                )
             }
             .padding(14)
+            .background(fileDropAreaFrameReader)
 
             Divider()
                 .padding(.horizontal, 14)
@@ -500,33 +523,372 @@ struct ContentView: View {
         }
     }
 
+    private var dropOverlay: some View {
+        ZStack {
+            globalDropHighlight
+
+            ForEach(activeDropAnimations) { animation in
+                DropSuctionTokenView(animation: animation)
+            }
+        }
+        .allowsHitTesting(false)
+    }
+
+    private var globalDropHighlight: some View {
+        RoundedRectangle(cornerRadius: 16)
+            .fill(Color.accentColor.opacity(isGlobalDropTargeted ? 0.05 : 0))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(
+                        Color.accentColor.opacity(isGlobalDropTargeted ? 0.45 : 0),
+                        style: StrokeStyle(lineWidth: 2, dash: [10, 6])
+                    )
+            )
+            .padding(8)
+            .animation(.easeInOut(duration: 0.15), value: isGlobalDropTargeted)
+    }
+
+    private var fileDropAreaFrameReader: some View {
+        GeometryReader { proxy in
+            Color.clear
+                .onAppear {
+                    fileDropAreaFrame = proxy.frame(in: .named(DropAnimationCoordinateSpace.name))
+                }
+                .onChange(of: proxy.frame(in: .named(DropAnimationCoordinateSpace.name))) { frame in
+                    fileDropAreaFrame = frame
+                }
+        }
+    }
+
     // MARK: - Helper Methods
 
-    private func autoGenerateWaveforms() {
-        guard let videoURL = viewModel.project.videoFile?.url,
-              let audioURL = viewModel.project.audioFile?.url else {
-            return
-        }
+    private func autoGenerateWaveforms(videoURL: URL, audioURL: URL) {
         Task {
             await syncViewModel.generateWaveforms(videoURL: videoURL, audioURL: audioURL)
         }
     }
 
-    private func setVideoFile(url: URL) {
-        if viewModel.project.videoFile != nil {
-            pendingFileAction = { viewModel.setVideoFile(url: url) }
-            showReplaceConfirmation = true
-        } else {
-            viewModel.setVideoFile(url: url)
+    private func generateWaveformsIfReady() {
+        guard let videoURL = viewModel.project.videoFile?.url,
+              let audioURL = viewModel.project.audioFile?.url else {
+            return
+        }
+
+        if let pendingWaveformRefresh {
+            guard videoURL.path == pendingWaveformRefresh.videoPath,
+                  audioURL.path == pendingWaveformRefresh.audioPath else {
+                return
+            }
+            self.pendingWaveformRefresh = nil
+        }
+
+        autoGenerateWaveforms(videoURL: videoURL, audioURL: audioURL)
+    }
+
+    private func recoverPendingWaveformRefreshIfNeeded() {
+        guard pendingWaveformRefresh != nil else { return }
+        pendingWaveformRefresh = nil
+        generateWaveformsIfReady()
+    }
+
+    private func handleGlobalDrop(providers: [NSItemProvider], location: CGPoint) -> Bool {
+        FileDropSupport.handleDrop(providers: providers, acceptedTypes: FileDropSupport.allTypes) { urls in
+            applyDroppedFiles(urls, dropLocation: location)
         }
     }
 
-    private func setAudioFile(url: URL) {
-        if viewModel.project.audioFile != nil {
-            pendingFileAction = { viewModel.setAudioFile(url: url) }
+    private func applyDroppedFiles(_ urls: [URL], dropLocation: CGPoint) {
+        let classifiedURLs = FileDropSupport.classify(urls: urls)
+
+        guard let invalidMessage = FileDropSupport.invalidDropMessage(
+            videoCount: classifiedURLs.video.count,
+            audioCount: classifiedURLs.audio.count
+        ) else {
+            applySelectedFiles(
+                videoURL: classifiedURLs.video.first,
+                audioURL: classifiedURLs.audio.first,
+                dropLocation: dropLocation
+            )
+            return
+        }
+
+        handleRejectedDrop(message: invalidMessage)
+    }
+
+    private func applySelectedFiles(videoURL: URL?, audioURL: URL?, dropLocation: CGPoint? = nil) {
+        var actions: [() -> Void] = []
+
+        if let videoURL {
+            actions.append { viewModel.setVideoFile(url: videoURL) }
+        }
+
+        if let audioURL {
+            actions.append { viewModel.setAudioFile(url: audioURL) }
+        }
+
+        guard !actions.isEmpty else { return }
+
+        pendingWaveformRefresh = makePendingWaveformRefresh(videoURL: videoURL, audioURL: audioURL)
+        let dropAnimationContext = makePendingDropAnimationContext(
+            videoURL: videoURL,
+            audioURL: audioURL,
+            dropLocation: dropLocation
+        )
+
+        let requiresReplacementConfirmation =
+            (videoURL != nil && viewModel.project.videoFile != nil) ||
+            (audioURL != nil && viewModel.project.audioFile != nil)
+
+        if requiresReplacementConfirmation {
+            pendingFileActions = actions
+            pendingDropAnimationContext = dropAnimationContext
             showReplaceConfirmation = true
         } else {
-            viewModel.setAudioFile(url: url)
+            pendingDropAnimationContext = nil
+            playDropAnimations(dropAnimationContext)
+            applyFileActions(actions)
+        }
+    }
+
+    private func applyFileActions(_ actions: [() -> Void]) {
+        actions.forEach { $0() }
+    }
+
+    private func makePendingWaveformRefresh(videoURL: URL?, audioURL: URL?) -> PendingWaveformRefresh? {
+        guard let videoURL, let audioURL else { return nil }
+        return PendingWaveformRefresh(videoPath: videoURL.path, audioPath: audioURL.path)
+    }
+
+    private func makePendingDropAnimationContext(
+        videoURL: URL?,
+        audioURL: URL?,
+        dropLocation: CGPoint?
+    ) -> PendingDropAnimationContext? {
+        guard let dropLocation else { return nil }
+
+        var mediaKinds: [FileDropSupport.MediaKind] = []
+        if videoURL != nil {
+            mediaKinds.append(.video)
+        }
+        if audioURL != nil {
+            mediaKinds.append(.audio)
+        }
+
+        guard !mediaKinds.isEmpty else { return nil }
+        return PendingDropAnimationContext(startPoint: dropLocation, mediaKinds: mediaKinds)
+    }
+
+    private func playPendingDropAnimationsIfNeeded() {
+        playDropAnimations(pendingDropAnimationContext)
+        pendingDropAnimationContext = nil
+    }
+
+    private func playDropAnimations(_ context: PendingDropAnimationContext?) {
+        guard let context else { return }
+
+        let newAnimations = context.mediaKinds.compactMap { mediaKind -> ActiveDropAnimation? in
+            guard let endPoint = dropAnimationEndpoint(for: mediaKind) else { return nil }
+            return ActiveDropAnimation(
+                iconName: dropAnimationIconName(for: mediaKind),
+                tint: dropAnimationTint(for: mediaKind),
+                startPoint: context.startPoint,
+                endPoint: endPoint
+            )
+        }
+
+        guard !newAnimations.isEmpty else { return }
+
+        activeDropAnimations.append(contentsOf: newAnimations)
+
+        let animationIDs = Set(newAnimations.map(\.id))
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
+            activeDropAnimations.removeAll { animationIDs.contains($0.id) }
+        }
+    }
+
+    private func dropAnimationEndpoint(for mediaKind: FileDropSupport.MediaKind) -> CGPoint? {
+        guard !fileDropAreaFrame.isEmpty else { return nil }
+        let targetFrame: CGRect
+
+        switch mediaKind {
+        case .video:
+            targetFrame = videoDropZoneFrame
+        case .audio:
+            targetFrame = audioDropZoneFrame
+        }
+
+        guard !targetFrame.isEmpty else { return nil }
+        return CGPoint(
+            x: targetFrame.minX + targetFrame.width * 0.3,
+            y: targetFrame.midY
+        )
+    }
+
+    private func dropAnimationIconName(for mediaKind: FileDropSupport.MediaKind) -> String {
+        switch mediaKind {
+        case .video:
+            return "film.fill"
+        case .audio:
+            return "waveform"
+        }
+    }
+
+    private func dropAnimationTint(for mediaKind: FileDropSupport.MediaKind) -> Color {
+        switch mediaKind {
+        case .video:
+            return .accentColor
+        case .audio:
+            return .purple
+        }
+    }
+
+    private func resetSyncStateForReplacement() {
+        viewModel.project.exportSettings.offsetSeconds = 0
+        syncViewModel.reset()
+    }
+
+    private func updateDropTargets(for mediaKinds: Set<FileDropSupport.MediaKind>) {
+        isVideoDropTargeted = mediaKinds.contains(.video)
+        isAudioDropTargeted = mediaKinds.contains(.audio)
+    }
+
+    private func resetDropTargets() {
+        isVideoDropTargeted = false
+        isAudioDropTargeted = false
+    }
+
+    private func handleRejectedDrop(message: String) {
+        viewModel.project.state = .error(message: message)
+    }
+
+    private func handleVideoDropZoneSelection(url: URL) {
+        if url.path.isEmpty {
+            viewModel.clearVideoFile()
+            syncViewModel.reset()
+        } else {
+            setVideoFile(url: url)
+        }
+    }
+
+    private func handleAudioDropZoneSelection(url: URL) {
+        if url.path.isEmpty {
+            viewModel.clearAudioFile()
+            syncViewModel.reset()
+        } else {
+            setAudioFile(url: url)
+        }
+    }
+
+    private func setVideoFile(url: URL) {
+        applySelectedFiles(videoURL: url, audioURL: nil)
+    }
+
+    private func setAudioFile(url: URL) {
+        applySelectedFiles(videoURL: nil, audioURL: url)
+    }
+}
+
+private struct ActiveDropAnimation: Identifiable {
+    let id = UUID()
+    let iconName: String
+    let tint: Color
+    let startPoint: CGPoint
+    let endPoint: CGPoint
+}
+
+private struct GlobalFileDropDelegate: DropDelegate {
+    let acceptedTypes: [UTType]
+    let isGlobalDropTargeted: Binding<Bool>
+    let onDragChanged: (Set<FileDropSupport.MediaKind>) -> Void
+    let onDragEnded: () -> Void
+    let onRejectedDrop: (String) -> Void
+    let onPerformDrop: ([NSItemProvider], CGPoint) -> Bool
+
+    func validateDrop(info: DropInfo) -> Bool {
+        !info.itemProviders(for: acceptedTypes).isEmpty
+    }
+
+    func dropEntered(info: DropInfo) {
+        updateDragState(with: info)
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        let providers = info.itemProviders(for: acceptedTypes)
+        isGlobalDropTargeted.wrappedValue = !providers.isEmpty
+
+        guard !providers.isEmpty else {
+            onDragChanged([])
+            return DropProposal(operation: .forbidden)
+        }
+
+        let isAllowedDrop = FileDropSupport.isAllowedDrop(providers: providers)
+        onDragChanged(isAllowedDrop ? FileDropSupport.mediaKinds(in: providers) : [])
+        return DropProposal(operation: .copy)
+    }
+
+    func dropExited(info: DropInfo) {
+        resetDragState()
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        let providers = info.itemProviders(for: acceptedTypes)
+        let location = info.location
+
+        resetDragState()
+
+        if let invalidMessage = FileDropSupport.invalidDropMessage(for: providers) {
+            onRejectedDrop(invalidMessage)
+            return true
+        }
+
+        return onPerformDrop(providers, location)
+    }
+
+    private func updateDragState(with info: DropInfo) {
+        let providers = info.itemProviders(for: acceptedTypes)
+        let isAllowedDrop = FileDropSupport.isAllowedDrop(providers: providers)
+        isGlobalDropTargeted.wrappedValue = !providers.isEmpty
+        onDragChanged(isAllowedDrop ? FileDropSupport.mediaKinds(in: providers) : [])
+    }
+
+    private func resetDragState() {
+        isGlobalDropTargeted.wrappedValue = false
+        onDragEnded()
+    }
+}
+
+private struct DropSuctionTokenView: View {
+    let animation: ActiveDropAnimation
+
+    @State private var hasStarted = false
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: animation.iconName)
+                .font(.system(size: 12, weight: .bold))
+            Circle()
+                .fill(animation.tint.opacity(0.7))
+                .frame(width: 6, height: 6)
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            Capsule()
+                .fill(animation.tint.opacity(0.92))
+        )
+        .overlay(
+            Capsule()
+                .stroke(Color.white.opacity(0.35), lineWidth: 1)
+        )
+        .shadow(color: animation.tint.opacity(0.28), radius: 10, x: 0, y: 6)
+        .position(hasStarted ? animation.endPoint : animation.startPoint)
+        .scaleEffect(hasStarted ? 0.42 : 1.0)
+        .opacity(hasStarted ? 0.04 : 1.0)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 0.45)) {
+                hasStarted = true
+            }
         }
     }
 }
